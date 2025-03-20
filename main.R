@@ -44,8 +44,8 @@ rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/remind/outpu
 rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/magpie/output"
 all_runscens <- c("SSP2")
 all_budgets <- c("PkBudg650", "PkBudg1000")
-regression <- 0 ##1 for regression with EUROSTAT Data.
-
+regression <- 1 ##1 for regression with EUROSTAT Data.
+gini_baseline <- 'raoGini' ##iiasaGini or raoGini
 
 #Project life-cycle
 all_paths = set_pathScenario(scenario_mode,write_namestring,rootdir_remind, rootdir_magpie,
@@ -62,7 +62,7 @@ if(regression){
 
 
 
-
+#-------------------------------to do-------------------------------------
 output= microsimulation (data,regression,'model')
 
 analysis = display (output)
