@@ -6,6 +6,7 @@ source('functions/read_remindBaseline.R')
 source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
 source('functions/analyze_regression.R')
+source('functions/predict_decileConsShare.R')
 
 #Load library
 library(remind2)
@@ -45,19 +46,23 @@ rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/magpie/outpu
 all_runscens <- c("SSP2")
 all_budgets <- c("PkBudg650", "PkBudg1000")
 regression <- 1 ##1 for regression with EUROSTAT Data.
+regression_model<-"logitTransOLS" # other available options are  "logitTransOLS", 'PolynomialLM'
 gini_baseline <- 'raoGini' ##iiasaGini or raoGini
 
 #Project life-cycle
 all_paths = set_pathScenario(scenario_mode,write_namestring,rootdir_remind, rootdir_magpie,
-                          all_runscens,all_budgets)
 
 data = prepare_modelData(all_paths)
 
 if(regression){
-  coef = analyze_regression(FALSE)
+  coef = analyze_regression(regression_model,TRUE)
 } else {
   print('Wait for MCC input')
 }
+
+decileConsShare <- predict_decileConsShare(data,isDisplay=T)
+
+predict_decileConsShare(data,isDisplay=T)
 
 
 

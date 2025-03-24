@@ -137,7 +137,9 @@ prepare_eurostatData <- function(){
                by= c('quantile','geo','TIME_PERIOD'))%>%
     inner_join( price[,!names(price) %in% c("unit", "OBS_FLAG")],
                 by= c('geo','TIME_PERIOD'))%>%
-    select (-OBS_FLAG)
+    select (-OBS_FLAG) %>%
+    mutate(TIME_PERIOD = factor(TIME_PERIOD),
+           geo = factor(geo))
   
   return(df)
   
