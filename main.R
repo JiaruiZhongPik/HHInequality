@@ -7,6 +7,7 @@ source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
 source('functions/analyze_regression.R')
 source('functions/predict_decileConsShare.R')
+source('functions/predict_decileWelfChange.R')
 
 #Load library
 library(remind2)
@@ -48,9 +49,10 @@ all_budgets <- c("PkBudg650", "PkBudg1000")
 regression <- 1 ##1 for regression with EUROSTAT Data.
 regression_model<-"logitTransOLS" # other available options are  "logitTransOLS", 'PolynomialLM'
 gini_baseline <- 'raoGini' ##iiasaGini or raoGini
+micro_model <- 'FOwelfare'
 
 #Project life-cycle
-all_paths = set_pathScenario(scenario_mode,write_namestring,rootdir_remind, rootdir_magpie,
+all_paths = set_pathScenario(scenario_mode,write_namestring,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
 data = prepare_modelData(all_paths)
 
@@ -60,10 +62,9 @@ if(regression){
   print('Wait for MCC input')
 }
 
-decileConsShare <- predict_decileConsShare(data,isDisplay=T)
+decileConsShare <- predict_decileConsShare(data,isDisplay=T, isExport=F)
 
-predict_decileConsShare(data,isDisplay=T)
-
+decileWelfChange <- predict_decileWelfChange(micro_model, data, decileConsShare, isDisplay = T, isExport = T )
 
 
 

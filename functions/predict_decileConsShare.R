@@ -67,9 +67,15 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     dataDecile <- dataDecile %>%
       select( -unit,-baseline ) %>%
       left_join(fixedEffects[ , !(names(fixedEffects) %in% 'unit')], by = c('scenario','model','region','period') ) %>%
-      mutate( eneShare = coef['(Intercept)','Energy'] + 
+      mutate( `share|Ene` = coef['(Intercept)','Energy'] + 
                 coef['log(exp)','Energy'] * log(consumptionCa) +
-                coef['I(log(exp)^2)','Energy']  * log(consumptionCa) ^ 2 + fixedEffects
+                coef['I(log(exp)^2)','Energy']  * log(consumptionCa) ^ 2 + fixedEffects,
+              
+              `share|Food` = coef['(Intercept)','Food'] + 
+                coef['log(exp)','Food'] * log(consumptionCa) +
+                coef['I(log(exp)^2)','Food']  * log(consumptionCa) ^ 2,
+              
+              `share|Comm` = 1 - `share|Ene` - `share|Food`
       )
     
   }else if (regression_model =='logitTransOLS'){
@@ -89,20 +95,20 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     dataDecile <- dataDecile %>%
       select( -unit,-baseline ) %>%
       left_join(fixedEffects[ , !(names(fixedEffects) %in% 'unit')], by = c('scenario','model','region','period') ) %>%
-      mutate( eneShareLogit = coef['(Intercept)','Energy'] + 
+      mutate( shareLogitEne = coef['(Intercept)','Energy'] + 
                 coef['log(exp)','Energy'] * log(consumptionCa) +
                 coef['I(log(exp)^2)','Energy']  * log(consumptionCa) ^ 2 + fixedEffects,
-              eneShare = 1 / (1 + exp(-eneShareLogit)),
+              `share|Ene` = 1 / (1 + exp(-shareLogitEne)),
               
-              foodShareLogit = coef['(Intercept)','Food'] +                            #Todo: Benchmark it to MagPIE Data!!
+              shareLogitFood = coef['(Intercept)','Food'] +                            #Todo: Benchmark it to MagPIE Data!!
                 coef['log(exp)','Food'] * log(consumptionCa) +
                 coef['I(log(exp)^2)','Food']  * log(consumptionCa) ^ 2,
-              foodShare = 1 / (1 + exp(-foodShareLogit)),
+              `share|Food` = 1 / (1 + exp(-shareLogitFood)),
               
-              commShare = 1 - eneShare - foodShare
+              `share|Comm` = 1 - `share|Ene` - `share|Food`
               
       ) %>%
-      select(scenario,model,region,period,decileGroup, consumptionCa, eneShare, foodShare, commShare)
+      select(scenario,model,region,period,decileGroup, consumptionCa, `share|Ene`, `share|Food`, `share|Comm`)
     
   }
   
@@ -116,7 +122,7 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     scale_color_discrete(name = "Region")+ 
     geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.5)
   
-  p2<- ggplot(dataDecile[dataDecile$decileGroup%in%c(1,10),], aes(x=log(consumptionCa), y = eneShare, color = factor(decileGroup))) +
+  p2<- ggplot(dataDecile[dataDecile$decileGroup%in%c(1,10),], aes(x=log(consumptionCa), y = `share|Ene`, color = factor(decileGroup))) +
     geom_point(alpha = 0.6)+
     facet_wrap(~scenario)+
     ylim(-0.1,0.4)+
