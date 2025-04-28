@@ -43,3 +43,8 @@ findReporting <- function(run,path,pattern){
   }
   return(x)
 }
+
+#utility function to capitalize the first letter
+capitalize_first <- function(s) {
+  paste0(toupper(substring(s, 1, 1)), substring(s, 2))
+}

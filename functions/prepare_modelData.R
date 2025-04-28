@@ -1,6 +1,6 @@
 #This function compiles all required data
 
-prepare_modelData <- function (all_paths){
+prepare_modelData <- function (all_paths,isDisplay = F, isExport = F){
   #Remind policy runs with relative changes to defined baseline scenario
   remind_policy <- 
     all_paths %>% 
@@ -10,7 +10,7 @@ prepare_modelData <- function (all_paths){
       print(remind_path)
       print(remind_path_base)
       
-      read_remindPolicy(remind_path,remind_path_base, do_plots = TRUE) %>%
+      read_remindPolicy(remind_run,remind_path,remind_path_base, isDisplay, isExport) %>%
         #        mutate(scenario = remind_run) %>%
         select(scenario, everything())
     }) 

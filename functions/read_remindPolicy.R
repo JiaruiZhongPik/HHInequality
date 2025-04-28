@@ -1,8 +1,11 @@
 #This funciton reads REMIND data
 
 
-read_remindPolicy <- function(remind_path, remind_path_base, do_plots = TRUE){
+read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDisplay = TRUE, isExport = TRUE){
   
+  #for testing purpose
+  # remind_path = all_paths$remind_path[1]
+  # remind_path_base = all_paths$remind_path_base[1]
   
   remind_data <- 
     read.quitte(c(remind_path, remind_path_base)) %>%
@@ -236,13 +239,18 @@ read_remindPolicy <- function(remind_path, remind_path_base, do_plots = TRUE){
   #                      "`FE net tax/sub|Rel`" = "`FE taxes|Rel` - `FE subsidies|Rel`")
   #   
   #   
-  if(do_plots) {
+  if(isDisplay) {
     p0<- ggplot(FE_consumerPriceDelt, aes( x =period, y=value * 100, color = variable ))+
-      geom_point()+
-      facet_wrap(~region, scales = "free_y")+
-      labs(title = "Energy price changes to Baseline(NPi)", x = "Year", y = "percentage(%)") +
-      theme_minimal()
+      geom_point(size = 0.6, alpha = 0.6 )+
+      geom_line()+
+      facet_wrap(~region)+
+      labs(title = paste0(str_extract(remind_run, "PkBudg[^-]+")," Energy price changes to Baseline(NPi)"), x = "Year", y = "percentage(%)") +
+      theme_minimal()+
+      coord_cartesian(ylim = c(-10, 400))
     print(p0)
+  }
+  if(isExport){
+    ggsave(paste0('figure/Energy price changes to Baseline (NPi)',str_extract(remind_run, "PkBudg[^-]+"),'.tiff'),p0 , width = 6, height =5, units = "in", dpi = 300 )
   }
   
   #   if (do_plots){

@@ -1,8 +1,8 @@
 # This simulates for HH welfare change given known price changes.
 
-predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isDisplay = FALSE, isExport = FALSE){
+predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOLS', missingMapping = NA, countryExample = NA, 
+                                    isDisplay = FALSE, isExport = FALSE){
   #TODO: Future food expenditure needs to be added
-  
   
   #Compute regional annual expenditure share
   data<-
@@ -11,12 +11,15 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
                    `FE|Buildings|Electricity` * `Price|Buildings|Electricity`+
                    `FE|Buildings|Other fuels` * `Price|Buildings|Other fuels`+
                    `FE|++|Transport` * `Price|Transport|FE`) /
-                   `Consumption`") %>%
-    filter(variable == "FEShare|Household") %>%
-    mutate(unit ='ratio') %>%
-    bind_rows(data)
+                   `Consumption`",
+                    "FEShare|Building gases" = "`FE|Buildings|Gases` * `Price|Buildings|Gases`/ `Consumption`",
+                    "FEShare|Building electricity" = "`FE|Buildings|Electricity` * `Price|Buildings|Electricity`/`Consumption`",
+                    "FEShare|Building other fuels" = "`FE|Buildings|Other fuels` * `Price|Buildings|Other fuels`/`Consumption`",
+                    "FEShare|Transport energy" = "`FE|++|Transport` * `Price|Transport|FE`/ `Consumption`"
+                     )
   
-  #Compute consumption expenditure of decile income groups
+  
+  #Compute total consumption expenditure share of decile income groups
   consShare <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE)%>%
     rename( period = V1,
             region = V2,
@@ -29,16 +32,18 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     select(-scenario)
   
   
-  plotdf =   data %>%
+  plotdf <-  data %>%
     select(-unit) %>%
-    filter ( variable %in% c('Consumption','FEShare|Household', 'Population')) %>%
+    filter(
+      variable %in% c("Consumption", "FEShare|Household", "Population") |
+        str_starts(variable, "FEShare\\|")
+    ) %>%
     pivot_wider(names_from = variable, values_from = value) %>%
     mutate(consumptionCA = Consumption / Population *1000)
   
-  dataDecile<-   data %>%
+  dataDecile <- data %>%
     calc_addVariable("consumptionCA" = "(`Consumption` *1e9)/(`Population` *1e6)",units = c("US$2017") )%>%
     filter( variable == 'consumptionCA' , 
-            scenario %in% paste0('C_',all_runscens,'-',all_budgets,'-rem','-5'),
             !region == 'World' ) %>%
     slice(rep(1:n(), each = 10)) %>% 
     group_by(region,period,scenario) %>%
@@ -48,6 +53,30 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     right_join(consShare, by = c("period", "region",'gdp_scenario','decileGroup'))%>%
     mutate(consumptionCa = value * consShare *10) %>%
     select( -value, -gdp_scenario, -consShare, -variable)
+  
+  
+  #Fill in missing regions with selected comparable regions
+  if(is.data.frame(missingMapping)){
+    missingFilled <- coef %>%
+      filter(region == "EUR") %>%
+      mutate(region_source = region) %>%  # keep a copy of the original
+      select(-region) %>%
+      crossing(region = missingMapping$missing)
+    
+    coef <- bind_rows(coef, missingFilled) %>%
+      select(-region_source)
+  }
+  
+  coef_expanded <- crossing(scenario = unique(data$scenario), coef,
+                            period = unique(data$period)) %>%
+    mutate( variable = paste (sector, regressor, sep='|')) %>%
+    select(-sector, -regressor ) %>%
+    mutate(model = 'empiric') 
+  
+  
+  if( length(unique(coef$region))==1){
+    coef_expanded <- crossing(region = setdiff(unique(data$region), "World"), coef_expanded %>% select(-region))
+  }
   
   
   if (regression_model == 'PolynomialLM'){
@@ -80,69 +109,316 @@ predict_decileConsShare <- function(data, regression_model = 'logitTransOLS',isD
     
   }else if (regression_model =='logitTransOLS'){
     
-    #Compute the adjusted fixed effects according to anual expenditure share
-    fixedEffects <- data%>%
-      filter( variable %in% c('Consumption', 'Population', 'FEShare|Household')) %>%
-      select(-unit,-baseline)%>%
-      pivot_wider(names_from = variable,  values_from = value) %>%
-      mutate( fixedEffects = log(`FEShare|Household`/(1-`FEShare|Household`)) - coef['(Intercept)','Energy'] -
-                coef['log(exp)','Energy'] * log((Consumption* 1e9) / (Population * 1e6))-
-                coef['I(log(exp)^2)','Energy'] * log((Consumption* 1e9)/(Population * 1e6 ))^2) %>%
-      select(-Consumption,-Population, -`FEShare|Household`)%>%
-      mutate(unit = "unitless")
+    #Compute the adjusted fixed effects according to annual expenditure share
     
-    #Compute decile-specific energy budget share  
-    dataDecile <- dataDecile %>%
-      select( -unit,-baseline ) %>%
-      left_join(fixedEffects[ , !(names(fixedEffects) %in% 'unit')], by = c('scenario','model','region','period') ) %>%
-      mutate( shareLogitEne = coef['(Intercept)','Energy'] + 
-                coef['log(exp)','Energy'] * log(consumptionCa) +
-                coef['I(log(exp)^2)','Energy']  * log(consumptionCa) ^ 2 + fixedEffects,
-              `share|Ene` = 1 / (1 + exp(-shareLogitEne)),
-              
-              shareLogitFood = coef['(Intercept)','Food'] +                            #Todo: Benchmark it to MagPIE Data!!
-                coef['log(exp)','Food'] * log(consumptionCa) +
-                coef['I(log(exp)^2)','Food']  * log(consumptionCa) ^ 2,
-              `share|Food` = 1 / (1 + exp(-shareLogitFood)),
-              
-              `share|Comm` = 1 - `share|Ene` - `share|Food`
-              
-      ) %>%
-      select(scenario,model,region,period,decileGroup, consumptionCa, `share|Ene`, `share|Food`, `share|Comm`)
+    if(length(unique(coef$sector)) == 9){
+      if(length(unique(coef$region)) == 1){
+        fixedEffects <- data %>%
+          filter(variable %in% c(
+            "Consumption", "Population", 
+            "FEShare|Building gases",
+            "FEShare|Building electricity",
+            "FEShare|Building other fuels",
+            "FEShare|Transport energy"
+          )) %>%
+          select(-unit, -baseline) %>%
+          pivot_wider(names_from = variable, values_from = value) %>%
+          left_join(
+            coef_expanded %>%
+              select(-model) %>%
+              pivot_wider(names_from = variable, values_from = value),
+            by = c("scenario", "period", "region")
+          ) %>%
+          mutate( `fixedEff|Building gases` =  log(`FEShare|Building gases`/(1-`FEShare|Building gases`)) - `Building gases|(Intercept)`-
+                    `Building gases|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
+                    `Building gases|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
+                  
+                  `fixedEff|Building electricity` = log(`FEShare|Building electricity`/(1-`FEShare|Building electricity`)) - `Building electricity|(Intercept)`-
+                    `Building electricity|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
+                    `Building electricity|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
+                  
+                  `fixedEff|Building other fuels` = log(`FEShare|Building other fuels`/(1-`FEShare|Building other fuels`)) - `Building other fuels|(Intercept)`-
+                    `Building other fuels|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
+                    `Building other fuels|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
+                  
+                  `fixedEff|Transport energy` = log(`FEShare|Transport energy`/(1-`FEShare|Transport energy`)) - `Transport energy|(Intercept)`-
+                    `Transport energy|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
+                    `Transport energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2
+          ) %>%
+          select(scenario, model, region, period, starts_with("fixedEff|"))
+        
+        
+        #Compute decile-specific energy budget share  
+        
+        
+        
+        dataDecile <- dataDecile %>%
+          select( -unit, -baseline,-model) %>%
+          left_join(fixedEffects[ , !(names(fixedEffects) %in% c('unit','model') )], by = c('scenario','region','period') ) %>%
+          left_join(
+            coef_expanded %>%
+              select(-model) %>%
+              pivot_wider(names_from = variable, values_from = value),
+            by = c("scenario", "period", "region")
+          )
+        
+        
+        dataFull <- dataDecile %>%
+          mutate( `shareLogit|Building gases` = `Building gases|(Intercept)` + 
+                    `Building gases|log(exp)` * log(consumptionCa) +
+                    `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building gases`,
+                  
+                  `shareLogit|Building electricity` = `Building electricity|(Intercept)` + 
+                    `Building electricity|log(exp)` * log(consumptionCa) +
+                    `Building electricity|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building electricity`,
+                  
+                  `shareLogit|Building other fuels` = `Building other fuels|(Intercept)` + 
+                    `Building other fuels|log(exp)` * log(consumptionCa) +
+                    `Building other fuels|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building other fuels`,
+                  
+                  `shareLogit|Transport energy` = `Transport energy|(Intercept)` + 
+                    `Transport energy|log(exp)` * log(consumptionCa) +
+                    `Transport energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Transport energy`,
+                  
+                  `shareLogit|Staple` = `Staple|(Intercept)` + 
+                    `Staple|log(exp)` * log(consumptionCa) +
+                    `Staple|I(log(exp)^2)`  * log(consumptionCa) ^ 2,    # Todo: + `fixedEff|Staple`
+                  
+                  `shareLogit|Animal products` = `Animal products|(Intercept)` + 
+                    `Animal products|log(exp)` * log(consumptionCa) +
+                    `Animal products|I(log(exp)^2)`  * log(consumptionCa) ^ 2,   # Todo: + `fixedEff|Animal products`
+                  
+                  `shareLogit|Fruits vegetables nuts` = `Fruits vegetables nuts|(Intercept)` + 
+                    `Fruits vegetables nuts|log(exp)` * log(consumptionCa) +
+                    `Fruits vegetables nuts|I(log(exp)^2)`  * log(consumptionCa) ^ 2,        # Todo: + `fixedEff|Fruits vegetables nuts`   
+                  
+                  `shareLogit|Empty calories` = `Empty calories|(Intercept)` + 
+                    `Empty calories|log(exp)` * log(consumptionCa) +
+                    `Empty calories|I(log(exp)^2)`  * log(consumptionCa) ^ 2,    # Todo: + `fixedEff|Empty calories`
+                  
+                  `share|Building gases` = 1 / (1 + exp(-`shareLogit|Building gases`)),
+                  
+                  `share|Building electricity` = 1 / (1 + exp(-`shareLogit|Building electricity`)),
+                  
+                  `share|Building other fuels` = 1 / (1 + exp(-`shareLogit|Building other fuels`)),
+                  
+                  `share|Transport energy` = 1 / (1 + exp(-`shareLogit|Transport energy`)),
+                  
+                  `share|Staple` = 1 / (1 + exp(-`shareLogit|Staple`)),
+                  
+                  `share|Animal products` = 1 / (1 + exp(-`shareLogit|Animal products`)),
+                  
+                  `share|Fruits vegetables nuts` = 1 / (1 + exp(-`shareLogit|Fruits vegetables nuts`)),
+                  
+                  `share|Empty calories` = 1 / (1 + exp(-`shareLogit|Empty calories`)),
+                  
+                  `share|Other commodities` = 1-`share|Building gases`-`share|Building electricity`-`share|Building other fuels`- `share|Transport energy`
+                  -`share|Staple`-`share|Animal products`-`share|Fruits vegetables nuts`-`share|Empty calories`
+                  
+          ) 
+        
+      }else if( length(unique(coef$sector)) ==3 ){
+        
+        #Compute the adjusted fixed effects according to annual expenditure share 
+        # Code as total, unfinished 
+        fixedEffects <- data%>%
+          filter( variable %in% c('Consumption', 'Population', 'FEShare|Household')) %>%
+          select(-unit,-baseline)%>%
+          pivot_wider(names_from = variable,  values_from = value) %>%
+          mutate( fixedEffects = log(`FEShare|Household`/(1-`FEShare|Household`)) - coef['(Intercept)','Energy'] -
+                    coef['log(exp)','Energy'] * log((Consumption* 1e9) / (Population * 1e6))-
+                    coef['I(log(exp)^2)','Energy'] * log((Consumption* 1e9)/(Population * 1e6 ))^2) %>%
+          select(-Consumption,-Population, -`FEShare|Household`)%>%
+          mutate(unit = "unitless")
+        
+      }
+    }
+  }  
+  
+  
+  
+  dfOutput<- dataFull %>%
+    select(scenario, region, period, decileGroup, consumptionCa, starts_with("share|"))
+
+  #Plot routine, seprate for s3 and s9 case
+  if(length(unique(coef$sector)) ==3){
+    p1<-ggplot(plotdf, aes(x = log(consumptionCA), y = `FEShare|Household` , color = factor(region) )) +
+      geom_point(alpha = 0.6)+
+      facet_wrap(~scenario)+
+      labs(title = "Average HH FE share (REMIND)", x = "log(ConsumptionCa), US$2017", y = "Share") +
+      theme_minimal()+
+      ylim(-0.1,0.4) +
+      scale_color_discrete(name = "Region")+ 
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+    
+    p2<- ggplot(dfOutput[dfOutput$decileGroup%in%c(1,10),], aes(x=log(consumptionCa), y = `share|Ene`, color = factor(decileGroup))) +
+      geom_point(alpha = 0.6)+
+      facet_wrap(~scenario)+
+      ylim(-0.1,0.4)+
+      labs(title = "Projected HH Fe share", x = "log(ConsumptionCa), US$2017", y = "Share") +
+      theme_minimal()+
+      scale_color_discrete(name = "Decile group")+ 
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+    
+    combined_plot<-p1+p2
+
+    if(isDisplay){
+      print(combined_plot)
+    } 
+    
+    if(isExport){
+      ggsave(paste0("figure/FE share projection_",regression_model,'.tiff'), combined_plot, width = 12, height =5, units = "in", dpi = 300)
+    }
+
+  } else if(length(unique(coef$sector)) ==9){
+
+     # Define sectors you want to loop through
+     sectors <- c(
+       "FEShare|Building gases",
+       "FEShare|Building electricity",
+       "FEShare|Building other fuels",
+       "FEShare|Transport energy"
+     )
+     
+     # Function to generate plots per sector
+     plot_sector <- function(sector) {
+       # Convert sector to its equivalent in dfOutput
+       dfOutput_sector <- sub("FEShare", "share", sector)
+       
+       # Create p1
+       p1 <- ggplot(
+         plotdf,
+         aes(x = log(consumptionCA), y = !!sym(sector), color = factor(region))
+       ) +
+         geom_point(alpha = 0.6) +
+         facet_wrap(~scenario) +
+         labs(
+           title = paste("REMIND -", sector),
+           x = "log(ConsumptionCa), US$2017",
+           y = "Share"
+         ) +
+         theme_minimal() +
+         ylim(-0.02, 0.15) +
+         scale_color_discrete(name = "Region") +
+         geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+       
+       # Create p2
+       p2 <- ggplot(
+         dfOutput[dfOutput$decileGroup %in% c(1, 10), ],
+         aes(x = log(consumptionCa), y = !!sym(dfOutput_sector), color = factor(decileGroup))
+       ) +
+         geom_point(alpha = 0.6) +
+         facet_wrap(~scenario) +
+         ylim(-0.02, 0.15) +
+         labs(
+           title = paste("Projected share -", sector),
+           x = "log(ConsumptionCa), US$2017",
+           y = "Share"
+         ) +
+         theme_minimal() +
+         scale_color_discrete(name = "Decile group") +
+         geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+       
+       p1+p2
+
+     }
+     
+     # Generate combined plots for each sector
+     combined_plots <- purrr::map(sectors, plot_sector)
+     
+     # Combine and display all plots in a grid
+     all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+       theme(legend.position = "bottom") 
+     
+     ggsave(
+       filename = "figure/combined_FE_share_plot_gcd.tiff",
+       plot = all_combined_plot,
+       width = 10,
+       height = 12,
+       dpi = 300,
+       compression = "lzw"
+     )
+     
+  if(!is.na(countryExample)){
+    
+    # Define sectors you want to loop through
+    sectors <- c(
+      "FEShare|Building gases",
+      "FEShare|Building electricity",
+      "FEShare|Building other fuels",
+      "FEShare|Transport energy"
+    )
+    
+    # Function to generate plots per sector
+    plot_sector <- function(sector) {
+      # Convert sector to its equivalent in dfOutput
+      dfOutput_sector <- sub("FEShare", "share", sector)
+      
+      # Create p1
+      p1 <- ggplot(
+        plotdf[plotdf$region == countryExample,],
+        aes(x = log(consumptionCA), y = !!sym(sector), color = factor(region))
+      ) +
+        geom_point(alpha = 0.6) +
+        facet_wrap(~scenario) +
+        labs(
+          title = paste("REMIND -", sector),
+          x = "log(ConsumptionCa), US$2017",
+          y = "Share"
+        ) +
+        theme_minimal() +
+        ylim(-0.02, 0.15) +
+        scale_color_discrete(name = "Region") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+      
+      # Create p2
+      p2 <- ggplot(
+        dfOutput[dfOutput$region==countryExample, ],
+        aes(x = log(consumptionCa), y = !!sym(dfOutput_sector), color = factor(decileGroup))
+      ) +
+        geom_point(alpha = 0.6) +
+        facet_wrap(~scenario) +
+        ylim(-0.02, 0.15) +
+        labs(
+          title = paste("Projected share -", sector),
+          x = "log(ConsumptionCa), US$2017",
+          y = "Share"
+        ) +
+        theme_minimal() +
+        scale_color_discrete(name = "Decile group") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+      
+      p1+p2
+      
+    }
+    
+    # Generate combined plots for each sector
+    combined_plots <- purrr::map(sectors, plot_sector)
+    
+    # Combine and display all plots in a grid
+    all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+      theme(legend.position = "bottom") 
+    
+    ggsave(
+      filename = paste0("figure/combined_FE_share_plot_gcd_",countryExample,".tiff"),
+      plot = all_combined_plot,
+      width = 10,
+      height = 12,
+      dpi = 300,
+      compression = "lzw"
+    )
+    
     
   }
+       
   
-  #Todo: add validation plot for food
-  p1<-ggplot(plotdf, aes(x = log(consumptionCA), y = `FEShare|Household`, color = factor(region) )) +
-    geom_point(alpha = 0.6)+
-    facet_wrap(~scenario)+
-    labs(title = "Average HH FE share (REMIND)", x = "log(ConsumptionCa), US$2017", y = "percentage(%)") +
-    theme_minimal()+
-    ylim(-0.1,0.4) +
-    scale_color_discrete(name = "Region")+ 
-    geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.5)
-  
-  p2<- ggplot(dataDecile[dataDecile$decileGroup%in%c(1,10),], aes(x=log(consumptionCa), y = `share|Ene`, color = factor(decileGroup))) +
-    geom_point(alpha = 0.6)+
-    facet_wrap(~scenario)+
-    ylim(-0.1,0.4)+
-    labs(title = "Projected HH Fe share", x = "log(ConsumptionCa), US$2017", y = "percentage(%)") +
-    theme_minimal()+
-    scale_color_discrete(name = "Decile group")+ 
-    geom_hline(yintercept = 0, linetype = "dashed", color = "red", size = 0.5)
-  
-  combined_plot<-p1+p2
-  
-  combined_plot
-  if(isDisplay){
-    print(combined_plot)
   }
   
-  if(isExport){
-    ggsave(paste0("figure/FE share projection_",regression_model,'.tiff'), combined_plot, width = 12, height =5, units = "in", dpi = 300)
-  }
   
-  return (dataDecile)
+
+  
+  
+  return (dfOutput)
 }
 
 

@@ -2,7 +2,7 @@
 #regression anlaysis
 
 
-prepare_eurostatData <- function(){
+prepare_eurostatData <- function(isDisplay = FALSE, isExport = FALSE){
   
   #--1.prepare the national total consumption data(Euro)--
   
@@ -140,6 +140,49 @@ prepare_eurostatData <- function(){
     select (-OBS_FLAG) %>%
     mutate(TIME_PERIOD = factor(TIME_PERIOD),
            geo = factor(geo))
+  
+  
+  #-----Visualize Data Availability-----
+  
+  world <- ne_countries(scale = "medium", returnclass = "sf")
+  euro_countries <- unique(df$geo)
+  
+  world_mapped <- world %>%
+    mutate(data_available = ifelse(admin %in% euro_countries, "Yes", "No"))
+  
+  plotCoverage <- ggplot(world_mapped) +
+    geom_sf(aes(fill = data_available), color = "white", size = 0.1) +
+    scale_fill_manual(values = c("Yes" = "#2c7bb6", "No" = "#cccccc")) +
+    labs(
+      title = "Country Coverage of Eurostat Dataset",
+      subtitle = "Countries with available data are shown in blue",
+      fill = "Data Available"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "bottom",
+      panel.background = element_rect(fill = "lightblue"),
+      plot.title = element_text(size = 16, face = "bold")
+    )
+  
+  
+  if(isDisplay){
+    print(plotCoverage)
+  }
+  
+  if(isExport){
+    ggsave(
+      filename = "figures/eurostat_coverage_map.tiff",
+      plot = plotCoverage,        # or use your plot object, e.g., plot_eurostat
+      width = 10,                 # width in inches
+      height = 6,                # height in inches
+      dpi = 300,                 # print-quality resolution
+      compression = "lzw"        # lossless compression
+    )
+    
+    
+  }
+  
   
   return(df)
   
