@@ -137,7 +137,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
   
   if(isExport){
     ggsave(
-      filename = "figure/gdc_coverage_map.png",  # or .pdf / .svg
+      filename = paste0(outputPath,"/gdc_coverage_map.png"),  # or .pdf / .svg
       plot = plotCoverage,               # or replace with your plot object
       width = 10,                       # in inches
       height = 6,

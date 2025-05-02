@@ -60,15 +60,17 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
       
       modelCommFe <- lm(wCommLogitShare ~ log(exp) + I(log(exp)^2)  + factor(geo) + factor(TIME_PERIOD), data = hhConsData)
       
-      
     }
     
-    
+
     coef = data.frame(
       Food = modelFoodFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')],
       Energy = modelEneFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')],
       Commodity = modelCommFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')]
-    )
+     ) %>%
+      rownames_to_column(var = 'regressor') %>%
+      pivot_longer(cols = c('Food','Energy','Commodity'), names_to = 'sector', values_to = 'value') %>%
+      mutate(region = 'pool')
     
     if(isDisplay){
       stargazer(modelFoodFe, modelEneFe, modelCommFe, 
@@ -144,7 +146,10 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
           sector = share,
           regressor = term,
           value = estimate
-        )
+        )%>%
+        mutate(sector = str_remove(sector, "^share\\|"))
+      
+      
     } else if (regression_model == 'logitTransOLS') {
       
       results_logit <- map(nested_data, function(region_df) {

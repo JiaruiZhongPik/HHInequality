@@ -342,7 +342,7 @@ plot_output <- function(outputPath, data,  plotlist='NA' , micro_model, fixed_po
   if(isExport|allExport){
     for (name in names(p)) {
       ggsave(
-        filename = paste0(outputPath, micro_model, capitalize_first(fixed_point),"/", name, ".tiff"),
+        filename = paste0(outputPath,'/', micro_model, capitalize_first(fixed_point),"/", name, ".tiff"),
         plot = p[[name]]$plot,
         width = p[[name]]$width,
         height = p[[name]]$height,

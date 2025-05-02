@@ -55,23 +55,23 @@ all_runscens <- c("SSP2")
 all_budgets <- c("PkBudg650", "PkBudg1000")
 regression <- 1                             ## if estimate coefficients within the project
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
-regionmapping <- 'H12'                      #options are: "H12", "H21", "country", "pool"
+regionmapping <- 'pool'                      #options are: "H12", "H21", "country", "pool"
 ConsData <- 'gcd'                           #options are: gcd (9 sectors), eurostat(3 sectors)
 gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
-micro_model <- 'FOwelfare'                  # options: "FOwelfareBase"; "FOwelfarePolicy", "FOwelfareMidpoint"
+micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
+outputPath <- "figure/test/"
 
 
 
-
-#Project life-cycle
+#----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(scenario_mode,write_namestring,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
 data = prepare_modelData(all_paths)
 
 if(regression){
-  coef = analyze_regression(regression_model = 'logitTransOLS', ConsData ='gcd', regionmapping = 'pool',
-                            isDisplay = TRUE, isExport = TRUE)
+  coef = analyze_regression(regression_model = regression_model, ConsData = ConsData, regionmapping = 'pool',
+                            isDisplay = TRUE, isExport = T)
 } else {
   print('Wait for MCC input')
 }
@@ -90,12 +90,10 @@ decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDispl
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point)
 
 #-------Plot-------
-outputPath <- "figure/test/"
-
 plot_output( outputPath = outputPath, data = decileWelfChange, micro_model = micro_model, fixed_point = fixed_point, allExport = T)
 
 #To get all regional plots
-for(r in unique(data$region)){
+for(r in unique(decileWelfChange$region)){
   
   plot_output( outputPath = outputPath, data = decileWelfChange, plotlist='welfByDecileSecEneRegion' , 
                micro_model = micro_model, fixed_point = fixed_point, exampleReg = r,isDisplay = F, isExport = T)
