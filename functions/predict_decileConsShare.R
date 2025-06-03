@@ -5,7 +5,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
   #TODO: Future food expenditure needs to be added
   
   #Compute regional annual expenditure share
-  data<-
+  data1<-
     data%>%
     calc_addVariable("FEShare|Household" = "(`FE|Buildings|Gases` * `Price|Buildings|Gases` +
                    `FE|Buildings|Electricity` * `Price|Buildings|Electricity`+
@@ -19,20 +19,50 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
                      )
   
   
-  #Compute total consumption expenditure share of decile income groups
-  consShare <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE)%>%
+  #Read Gini for SSPs
+  shareSSP <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE)%>%
     rename( period = V1,
             region = V2,
             scenario = V3,
             decileGroup = V4,
             consShare = V5) %>%
-    mutate( gdp_scenario =   gsub("^gdp_", "", scenario) ) %>%
+    mutate( gdp_scenario =   gsub("^gdp_", "", scenario)) %>%
+    select( -scenario ) %>%
+    filter(grepl("^SSP[0-9]$", gdp_scenario))
+  
+  #Read Gini for SDPs, from Min et al.(2024)
+  #Note: 1) the shape data use older SSP1 data, therefore the inequality measure computed from Shape data
+  # is different from the consumption share that is computed using MRREMIND.
+  #Note: 2) Shape SDP doesn't provide historic data, take that from SSP1  
+  shareSDP <- prepare_GiniSDP() %>%
+    mutate( gdp_scenario = as.character( gdp_scenario))
+  
+  ssp1_hist <- shareSSP %>%
+    filter(gdp_scenario == "SSP1", period %in% c(2000,2005, 2010, 2015))
+  
+  sdp_scenarios <- shareSDP %>%
+    distinct(gdp_scenario)
+  
+  filled_hist <- cross_join(ssp1_hist, sdp_scenarios) %>%
+    mutate(gdp_scenario = gdp_scenario.y) %>%
+    select(-gdp_scenario.x, -gdp_scenario.y)
+  
+  shareSDP_filled <- bind_rows(shareSDP, filled_hist)
+  
+  
+  # combine data and also generate the consumption shares for the SDP scenario SSP2EU, which take the number from SSP2
+  consShare<- bind_rows(shareSSP,shareSDP_filled) 
+  consShare<- consShare %>%
+    filter(gdp_scenario == "SSP2") %>%
+    mutate(gdp_scenario = "SSP2EU") %>%
+    bind_rows(consShare)
+
+  # select scenarios that are used for the anlaysis
+  consShare <- consShare %>%
     filter(gdp_scenario %in% all_runscens,
-           period %in% unique(data$period)) %>%
-    select(-scenario)
-  
-  
-  plotdf <-  data %>%
+           period %in% unique(data$period))
+    
+  plotdf <-  data1 %>%
     select(-unit) %>%
     filter(
       variable %in% c("Consumption", "FEShare|Household", "Population") |
@@ -41,14 +71,14 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
     pivot_wider(names_from = variable, values_from = value) %>%
     mutate(consumptionCA = Consumption / Population *1000)
   
-  dataDecile <- data %>%
+  dataDecile <- data1 %>%
     calc_addVariable("consumptionCA" = "(`Consumption` *1e9)/(`Population` *1e6)",units = c("US$2017") )%>%
     filter( variable == 'consumptionCA' , 
             !region == 'World' ) %>%
     slice(rep(1:n(), each = 10)) %>% 
     group_by(region,period,scenario) %>%
     mutate(decileGroup = 1:10,
-           gdp_scenario = sub(".*(SSP[0-9]+).*", "\\1", scenario)) %>%  
+           gdp_scenario = sub(".*((SSP[0-9]+[A-Z]*?)|(SDP_[^\\-]+)).*", "\\1", scenario)) %>%  
     ungroup()  %>%
     right_join(consShare, by = c("period", "region",'gdp_scenario','decileGroup'))%>%
     mutate(consumptionCa = value * consShare *10) %>%
@@ -220,7 +250,8 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
     
     if(length(unique(coef$sector)) == 9){
       if(length(unique(coef$region)) == 1){
-        fixedEffects <- data %>%
+        
+        fixedEffects <- data1 %>%
           filter(variable %in% c(
             "Consumption", "Population", 
             "FEShare|Building gases",
@@ -256,8 +287,10 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
         
         
         #Compute decile-specific energy budget share  
+
         
-        dataDecile <- dataDecile %>%
+        
+        dataFull <- dataDecile %>%
           select( -unit, -baseline,-model) %>%
           left_join(fixedEffects[ , !(names(fixedEffects) %in% c('unit','model') )], by = c('scenario','region','period') ) %>%
           left_join(
@@ -265,10 +298,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
               select(-model) %>%
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
-          )
-        
-        
-        dataFull <- dataDecile %>%
+          ) %>%
           mutate( `shareLogit|Building gases` = `Building gases|(Intercept)` + 
                     `Building gases|log(exp)` * log(consumptionCa) +
                     `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building gases`,
@@ -326,7 +356,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
         
         #Compute the adjusted fixed effects according to annual expenditure share 
         # Code as total, unfinished 
-        fixedEffects <- data%>%
+        fixedEffects <- data1%>%
           filter( variable %in% c('Consumption', 'Population', 'FEShare|Household')) %>%
           select(-unit,-baseline)%>%
           pivot_wider(names_from = variable,  values_from = value) %>%
@@ -341,8 +371,9 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
                     `Energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2) %>%
           select(scenario, model, region, period, starts_with("fixedEff|"))
 
-        
-        dataDecile <- dataDecile %>%
+
+      
+        dataFull <- dataDecile %>%
           select( -unit, -baseline,-model) %>%
           left_join(fixedEffects[ , !(names(fixedEffects) %in% c('unit','model') )], by = c('scenario','region','period') ) %>%
           left_join(
@@ -350,10 +381,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
               select(-model) %>%
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
-          )
-        
-        
-        dataFull <- dataDecile %>%
+          ) %>%
           mutate( `shareLogit|Energy` = `Energy|(Intercept)` + 
                     `Energy|log(exp)` * log(consumptionCa) +
                     `Energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Energy`,

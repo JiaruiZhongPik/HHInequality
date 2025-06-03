@@ -7,10 +7,12 @@ source('functions/analyze_regression.R')
 source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
 source('functions/prepare_gcdData.R')
+source('functions/prepare_giniSDP.R')
 source('functions/analyze_regression.R')
 source('functions/predict_decileConsShare.R')
 source('functions/predict_decileWelfChange.R')
 source('functions/plot_output.R')
+
 
 #Load library
 library(remind2)
@@ -49,11 +51,22 @@ options(dplyr.summarise.inform = FALSE)
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
-rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/remind/output"
-rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/magpie/output"
-all_runscens <- c("SSP2")
-all_budgets <- c("PkBudg650", "PkBudg1000")
-REMIND_pattern <- "REMIND_generic*.mif"
+rootdir_remind <- "/p/projects/piam/SHAPE_runs/coupled_2023-05-03_final/remind/output"
+rootdir_magpie <- "/p/projects/piam/SHAPE_runs/coupled_2023-05-03_final/magpie/output"
+
+all_runscens <- c(rep("SDP_EI",1),
+                  rep("SDP_MC",1),
+                  rep("SDP_RC",1),
+                  rep("SSP2EU",1),
+                  rep("SSP1",1))
+
+all_budgets <- c("PkBudg650-taxInc3", #SDP_EI, other options: "PkBudg500", "PkBudg650-taxInc3-CCimp"                         
+                 "PkBudg650",         #SDP_MC, other options: "PkBudg500", "PkBudg650-CCimp",
+                 "PkBudg650",         #SDP_RC, other options: "PkBudg500", "PkBudg650-CCimp", 
+                 "PkBudg650-taxInc6", #SSP2EU, other options: "PkBudg500", "PkBudg650-taxInc6-CCimp", "NDC", "NPi-CCimp", 
+                 "PkBudg650-taxInc3") #SSP1,   other options: "PkBudg500", "NDC"
+
+REMIND_pattern <- "REMIND_generic*rem-5.mif"
 
 #Modelling setting
 regression <- 1                             ## if estimate coefficients within the project
@@ -63,12 +76,10 @@ ConsData <- 'gcd'                           #options are: gcd (9 sectors), euros
 gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- "figure/s9"
-
-
+outputPath <- "figure/test/shape"
 
 #----------------------------Project life-cycle---------------------------------
-all_paths = set_pathScenario(scenario_mode,write_namestring, REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
+all_paths = set_pathScenario(scenario_mode, write_namestring, REMIND_pattern, rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
 data = prepare_modelData(all_paths)
 
@@ -83,16 +94,18 @@ if(regression){
 #I wanted to use EUR for other developed world but found that EUR has only 
 #limited observations too, so this is not a good strategy
 
- # missingMapping <- data.frame(
- #   missing = c('CAZ', 'JPN', 'USA'),
- #   replaceWith = c('EUR', 'EUR', 'EUR'))
+# missingMapping <- data.frame(
+#   missing = c('CAZ', 'JPN', 'USA'),
+#   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-#Todo: make it work for other variation.
+#Todo:include sdp gini pathway
 decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDisplay=F, isExport=T, countryExample = 'IND')
 
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point)
 
+
 #-------Plot-------
+#Todo: This plotting profile needs to be revised
 plot_output( outputPath = outputPath, data = decileWelfChange, micro_model = micro_model, fixed_point = fixed_point, allExport = T)
 
 #To get all regional plots
@@ -102,5 +115,3 @@ for(r in unique(decileWelfChange$region)){
                micro_model = micro_model, fixed_point = fixed_point, exampleReg = r,isDisplay = F, isExport = T)
   
 }
-
-

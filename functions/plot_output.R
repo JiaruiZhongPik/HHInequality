@@ -40,7 +40,7 @@ plot_output <- function(outputPath, data,  plotlist='NA' , micro_model, fixed_po
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
         scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000-rem-5" = "#e8ab67",
+          "C_SSP2EU-PkBudg650-taxInc6-rem-5" = "#e8ab67",
           "C_SSP2-PkBudg650-rem-5"  = "#264f78"
         ))+
         
