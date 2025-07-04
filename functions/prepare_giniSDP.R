@@ -142,7 +142,7 @@ prepare_GiniSDP <- function(){
            decileGroup = decile,
            gdp_scenario = scenario,
            consShare = value)%>%
-    mutate(period = as.integer(sub("y", "", df$year)),
+    mutate(period = as.integer(sub("y", "", period)),
            decileGroup = as.integer(decileGroup))
   
   return(df)

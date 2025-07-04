@@ -48,3 +48,44 @@ findReporting <- function(run,path,pattern){
 capitalize_first <- function(s) {
   paste0(toupper(substring(s, 1, 1)), substring(s, 2))
 }
+
+
+#utility function to compute un/weighted Theil's T and L index
+compute_theil.wtd <- function(x, weights = NULL, type = c("T", "L")) { 
+  type <- match.arg(type)  # Ensure valid type
+  
+  if (is.null(weights)) {
+    weights <- rep(1, length(x))
+  }
+  
+  # Remove NAs
+  valid <- !(is.na(x) | is.na(weights))
+  x <- x[valid]
+  weights <- weights[valid]
+  
+  if (!all(weights >= 0)) stop("At least one weight is negative.")
+  if (all(weights == 0)) stop("All weights are zero.")
+  
+  # Select positive x only
+  positive <- x > 0
+  x_sel <- x[positive]
+  weights_sel <- weights[positive]
+  
+  # Normalize weights
+  weights_sel <- weights_sel / sum(weights_sel)
+  
+  # Compute weighted mean
+  mean_x <- stats::weighted.mean(x_sel, weights_sel)
+  
+  if (type == "T") {
+    # Theil T: emphasizes top inequality
+    x_norm <- x_sel / mean_x
+    theil <- sum(weights_sel * x_norm * log(x_norm))
+  } else if (type == "L") {
+    # Theil L: emphasizes bottom inequality
+    x_norm <- mean_x / x_sel
+    theil <- sum(weights_sel * log(x_norm))
+  }
+  
+  return(theil)
+}

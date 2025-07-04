@@ -3,14 +3,22 @@ source('utils/utils.R')
 source('functions/set_pathScenario.R')
 source('functions/read_remindPolicy.R')
 source('functions/read_remindBaseline.R')
+source('functions/read_magpiePrice.R')
+source('functions/read_magpieExpShare.R')
+source('functions/read_magpiePolicy.R')
+source('functions/read_magpieBase.R')
 source('functions/analyze_regression.R')
 source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
 source('functions/prepare_gcdData.R')
+source('functions/prepare_giniSDP.R')
 source('functions/analyze_regression.R')
 source('functions/predict_decileConsShare.R')
 source('functions/predict_decileWelfChange.R')
 source('functions/plot_output.R')
+source('functions/aggregate_decileWelfChange.R')
+source('functions/compute_inequalityMetrics.R')
+
 
 #Load library
 library(remind2)
@@ -43,15 +51,23 @@ library(broom)
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
+library(gdx)
+library(withr)
+library(magpiesets)
+library(ineq)
+library(gtools)
+library(dineq)
+library(acid)
 options(dplyr.summarise.inform = FALSE)
 
 
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
-rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/remind/output"
-rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2024-11-21/magpie/output"
+rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
+rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
 all_runscens <- c("SSP2")
+reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"     
 all_budgets <- c("PkBudg650", "PkBudg1000")
 REMIND_pattern <- "REMIND_generic*.mif"
 
@@ -63,14 +79,19 @@ ConsData <- 'gcd'                           #options are: gcd (9 sectors), euros
 gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- "figure/s9"
+outputPath <- "figure/test/s9"
 
 
 
 #----------------------------Project life-cycle---------------------------------
-all_paths = set_pathScenario(scenario_mode,write_namestring, REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
+all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
+                             REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
-data = prepare_modelData(all_paths)
+#Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affectec
+#by smoothing. So I'd only use prices after that for simulation.
+data = prepare_modelData(all_paths) %>% 
+  filter(period %notin% c(1995,2000,2005,2010))
+
 
 if(regression){
   coef = analyze_regression(regression_model = regression_model, ConsData = ConsData, regionmapping = regionmapping,
@@ -87,18 +108,53 @@ if(regression){
  #   missing = c('CAZ', 'JPN', 'USA'),
  #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-#Todo: make it work for other variation.
-decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDisplay=F, isExport=T, countryExample = 'IND')
+decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 
-decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point)
+decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point) # unit %
+
+#to get some aggregated results
+# out <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, 
+#                            level = c("full"), region = 'region')
+# write.csv(out, 'result.csv')
+
+
+ineq<-compute_inequalityMetrics(data1 = decileWelfChange, 
+                                 data2 = decileConsShare, 
+                                 montecarlo = TRUE, n_perms = 300)
+
+
+#validate the theil combiled in total and decomposed
+#ineq[['theilDecomp']] %>% group_by(scenario, period) %>% summarise(theil= sum(Tt.i))
+#ineq[['ineq']]%>%filter(category == 'Total', variable =='ineq|TheilPost', region=='World')
+
 
 #-------Plot-------
-plot_output( outputPath = outputPath, data = decileWelfChange, micro_model = micro_model, fixed_point = fixed_point, allExport = T)
+#all plots
+plot_output(outputPath = outputPath, 
+            plotdataWelf  = decileWelfChange, 
+            data2 = decileConsShare, 
+            data3 = data, 
+            plotdataIneq = ineq,
+            micro_model = micro_model, fixed_point = fixed_point, allExport = T)
+
+#any individual plot
+plot_output(outputPath = outputPath, 
+            plotdataWelf  = decileWelfChange, 
+            data2 = decileConsShare, 
+            data3 = data, 
+            plotdataIneq = ineq,
+            plotlist = 'ineqGlobalWithinRegTheilT',
+            micro_model = micro_model, fixed_point = fixed_point, isExport = T)
 
 #To get all regional plots
-for(r in unique(decileWelfChange$region)){
+for(r in c(unique(decileWelfChange$region),'World') ){
   
-  plot_output( outputPath = outputPath, data = decileWelfChange, plotlist='welfByDecileSecEneRegion' , 
+  plot_output( outputPath = outputPath, 
+               plotdataWelf = decileWelfChange, 
+               data2 = decileConsShare, 
+               data3 = data, 
+               plotdataIneq = ineq,
+               plotlist='ineqRegBySec' , 
                micro_model = micro_model, fixed_point = fixed_point, exampleReg = r,isDisplay = F, isExport = T)
   
 }

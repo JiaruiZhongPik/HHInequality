@@ -43,13 +43,13 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
       
       #Prepare data:clip data to stay strictly between 0 and 1, which is required for logit transformation 
       hhConsData<-hhConsData %>%
-        mutate(wFoodClipped = pmin(pmax(wFood, 1e-5), 1 - 1e-5),
+        mutate(wFoodClipped = pmin(pmax(wFood, 1e-4), 1 - 1e-4),
                wFoodLogitShare = log(wFoodClipped / (1 - wFoodClipped)),
                
-               wEneClipped = pmin(pmax(wEnergy, 1e-5), 1 - 1e-5),
+               wEneClipped = pmin(pmax(wEnergy, 1e-4), 1 - 1e-4),
                wEneLogitShare = log(wEneClipped / (1 - wEneClipped)),
                
-               wCommClipped = pmin(pmax(wCommodity, 1e-5), 1 - 1e-5),
+               wCommClipped = pmin(pmax(wCommodity, 1e-4), 1 - 1e-4),
                wCommLogitShare = log(wCommClipped / (1 - wCommClipped)),
         )
       
@@ -160,7 +160,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
         
         map(share_cols, function(col) {
           # Apply clipping and logit transform to the LHS variable
-          y_clipped <- pmin(pmax(region_df[[col]], 1e-5), 1 - 1e-5)
+          y_clipped <- pmin(pmax(region_df[[col]], 1e-4), 1 - 1e-4)
           region_df$y_logit <- log(y_clipped / (1 - y_clipped))  # logit transform
           
           # Choose regression formula

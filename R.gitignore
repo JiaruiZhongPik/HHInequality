@@ -49,4 +49,6 @@ po/*~
 rsconnect/
 
 # ignore input folder
+figure/
 input/
+scripts/

@@ -1,13 +1,13 @@
 #Defines the scenarios and path of REMIND runs
 
 
-set_pathScenario<-function (scenario_mode,write_namestring, REMIND_pattern, rootdir_remind, rootdir_magpie,
+set_pathScenario<-function (  reference_run_name, scenario_mode,write_namestring, REMIND_pattern, rootdir_remind, rootdir_magpie,
                             all_runscens,all_budgets){
   #if cluster folders are mounted locally
   mountdir <- "S:"
 
   run_prefix <- "C_"
-  reference_run_name <- "NPi"
+
   remind_iteration <- "-rem-5"
   magpie_iteration <- "-mag-4"
 

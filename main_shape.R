@@ -8,7 +8,6 @@ source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
 source('functions/prepare_gcdData.R')
 source('functions/prepare_giniSDP.R')
-source('functions/analyze_regression.R')
 source('functions/predict_decileConsShare.R')
 source('functions/predict_decileWelfChange.R')
 source('functions/plot_output.R')
@@ -45,6 +44,8 @@ library(broom)
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
+library(gdx)
+library(withr)
 options(dplyr.summarise.inform = FALSE)
 
 
@@ -107,6 +108,7 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 #-------Plot-------
 #Todo: This plotting profile needs to be revised
 plot_output( outputPath = outputPath, data = decileWelfChange, micro_model = micro_model, fixed_point = fixed_point, allExport = T)
+
 
 #To get all regional plots
 for(r in unique(decileWelfChange$region)){

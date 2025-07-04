@@ -68,7 +68,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
     mutate(unit = 'share',
            sector = case_when(
              sector == "animal products"  ~ "share|Animal products",
-             sector == "staple" ~ "share|Staple",
+             sector == "staple" ~ "share|Staples",
              sector == "fruits&vegetables&nuts" ~ "share|Fruits vegetables nuts",
              sector == "empty calories" ~ "share|Empty calories",
              sector == "final energy for passenger transportation" ~ "share|Transport energy",

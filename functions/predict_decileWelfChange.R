@@ -44,9 +44,14 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
       mutate( value = 0,
               variable = 'deltPrice|Food')
     
+    deltPrice <- bind_rows(deltPriceFood,deltPriceEne,deltPriceComm) %>%
+      separate(col = variable,into = c("variable", "category"), sep = "\\|") %>%
+      rename(deltPrice = value) %>%
+      select(-variable)
+    
   } else if ( length(sectors) == 9 ){
     
-    deltPriceEne <- data1 %>%
+    deltPrice <- data1 %>%
       select(-unit,-baseline)%>%
       filter(
         str_starts(variable, "deltPrice"),
@@ -60,7 +65,6 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
         variable == "deltPrice|Buildings|Gases" ~ "deltPrice|Building gases",
         TRUE ~ variable  # keep unchanged otherwise
       )) %>%
-      
       #Note: there are INF for minor cases, when the base year price is zero. For
       #these, I currently replace with the value from the closest year
       #same is done for food price
@@ -70,42 +74,22 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
         max(value[is.finite(value)], na.rm = TRUE),
         value
       )) %>%
-      ungroup()
+      ungroup() 
     
     
-    deltPriceEne_fixed <- deltPriceEne 
-    
-    deltPriceFood <- deltPriceEne %>%
-      mutate(
-        value = 0,
-        variable = case_when(
-          variable ==  "deltPrice|Transport energy" ~ "deltPrice|Staple",
-          variable ==  "deltPrice|Building electricity" ~ "deltPrice|Animal products" ,
-          variable == "deltPrice|Building other fuels" ~ "deltPrice|Fruits vegetables nuts",
-          variable == "deltPrice|Building gases" ~ "deltPrice|Empty calories",
-          TRUE ~ variable  # keep unchanged otherwise
-        )
-      ) %>%
-      group_by(region, scenario, variable) %>%
-      mutate(value = ifelse(
-        is.infinite(value),
-        max(value[is.finite(value)], na.rm = TRUE),
-        value
-      )) %>%
-      ungroup()
-    
-    deltPriceComm <- deltPriceEne %>% 
-      filter( variable == "deltPrice|Transport energy") %>%
-      mutate( value = 0,
-              variable = 'deltPrice|Other commodities')
+    deltPrice <- deltPrice %>%
+      bind_rows(  deltPrice %>% 
+                    filter( variable == 'deltPrice|Building electricity' ) %>%
+                    mutate( value = 0,
+                            variable = 'deltPrice|Other commodities')
+                      )  %>%
+      separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
+      select( -variable ) %>%
+      rename( deltPrice = value )
+
   }
   
-  
-  deltPrice <- bind_rows(deltPriceFood,deltPriceEne,deltPriceComm) %>%
-    separate(col = variable,into = c("variable", "category"), sep = "\\|") %>%
-    rename(deltPrice = value) %>%
-    select(-variable)
-  
+
   
   if(micro_model == 'FOwelfare'){
     
@@ -114,14 +98,14 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
       decileWelfChange<-
         data2 %>%
         select(-consumptionCa)%>%
-        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets,'-rem-5'  ))%>%
+        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets  )) %>%
         pivot_longer( cols = starts_with('share'),
                       names_to = 'variable',
-                      values_to = 'share')%>%
-        separate( col= variable,into = c("variable", "category"), sep = "\\|"  )%>%
+                      values_to = 'share') %>%
+        separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
         select(-variable ) %>%
         left_join(deltPrice %>% select(-model), by = c('scenario','region','period','category')) %>%
-        group_by(scenario, region, period, decileGroup, category)%>%
+        group_by(scenario, region, period, decileGroup, category) %>%
         summarise(
           decilWelfChange = -  sum(deltPrice * share) * 100,
           .groups = "drop"
@@ -129,24 +113,35 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
       
     }else if (fixed_point == 'base'){
       
+      mapping <- all_paths %>%
+        select( remind_run, remind_base ) %>%
+      mutate(
+        remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
+        remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
+      )
+      
       baseConsShare <- data2 %>%
-        filter(scenario %in% all_paths$remind_base) %>%
-        left_join(all_paths %>% select(remind_base, remind_run), 
-                  by = c("scenario" = "remind_base")) %>%
-        mutate (scenario = remind_run)%>%
-        select( -consumptionCa) 
+        filter(
+          scenario %in% 
+            (all_paths$remind_base %>% 
+               str_remove("-(rem|mag)-\\d+$") %>% 
+               unique())
+               ) %>%
+        select(-consumptionCa) %>%
+        rename(remind_base = scenario)
       
       decileWelfChange <- data2 %>%
-        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets,'-rem-5')) %>%
+        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%
         select(scenario,region,period, decileGroup) %>%
-        merge(baseConsShare, by = c( "region", "period", "decileGroup", "scenario")) %>%
+        left_join( mapping, by= c('scenario'= 'remind_run') ) %>%
+        merge(baseConsShare, by = c( "region", "period", "decileGroup", "remind_base")) %>%
         pivot_longer( cols = starts_with('share'),
                       names_to = 'variable',
-                      values_to = 'share')%>%
-        separate( col= variable,into = c("variable", "category"), sep = "\\|"  )%>%
+                      values_to = 'share') %>%
+        separate( col= variable,into = c("variable", "category"), sep = "\\|") %>%
         select(-variable ) %>%
         left_join(deltPrice, by = c('scenario','region','period','category')) %>%
-        group_by(scenario, region, period, decileGroup,category)%>%
+        group_by(scenario, region, period, decileGroup,category) %>%
         summarise(
           decilWelfChange = -  sum(deltPrice * share) * 100,
           .groups = "drop"
@@ -154,21 +149,32 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
       
     } else if (fixed_point == 'midpoint') {
       
+      mapping <- all_paths %>%
+        select( remind_run, remind_base ) %>%
+        mutate(
+          remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
+          remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
+        )
+      
       baseConsShare <- data2 %>%
-        filter(scenario %in% all_paths$remind_base) %>%
-        left_join(all_paths %>% select(remind_base, remind_run), 
-                  by = c("scenario" = "remind_base")) %>%
-        mutate (scenario = remind_run)%>%
-        select( -consumptionCa)  %>%
+        filter(
+          scenario %in% 
+            (all_paths$remind_base %>% 
+               str_remove("-(rem|mag)-\\d+$") %>% 
+               unique())
+        ) %>%
+        select(-consumptionCa) %>%
+        rename(remind_base = scenario)  %>%
         rename_with(
           .fn = ~ paste0(., "|Base"),
           .cols = starts_with("share|")
         )
       
-      df<-data2 %>%
-        select( -consumptionCa)%>%
-        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets,'-rem-5')) %>%
-        merge(baseConsShare, by = c( "region", "period", "decileGroup",'scenario')) 
+      consShare <- data2 %>%
+        select( -consumptionCa) %>%
+        filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%
+        left_join( mapping, by= c('scenario'= 'remind_run')) %>%
+        merge(baseConsShare, by = c( "region", "period", "decileGroup", "remind_base"))
       
       
       for (s in sectors) {
@@ -176,10 +182,10 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
         base_col <- paste0("share|", s, "|Base")
         avg_col  <- paste0("share|", s, "|Avg")
         
-        df[[avg_col]] <- (df[[orig_col]] + df[[base_col]]) / 2
+        consShare[[avg_col]] <- (consShare[[orig_col]] + consShare[[base_col]]) / 2
       }
       
-      decileWelfChange <- df %>%
+      decileWelfChange <- consShare %>%
         select(
           -matches("^share\\|[^|]+$"),    # removes original share|X
           -matches("\\|Base$")            # removes any column ending with |Base

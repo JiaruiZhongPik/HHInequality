@@ -10,7 +10,8 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     remind_data %>% 
     filter(grepl("Price|Final Energy",variable,fixed = TRUE)) %>% 
     # remove "Stationary" prices (not a real FE sector like industry/buildings/transport/CDR)
-    filter(!grepl("Stationary",variable)) %>% 
+    filter(!grepl("Stationary",variable),
+           !region == 'World') %>% 
     separate(variable, into = c(NA,NA,"sector","carrier","further"), sep = "\\|", extra = "merge", fill = "right") %>% 
     filter(is.na(further)) %>% 
     select(-further) %>% 
@@ -28,7 +29,8 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
       filter(is.na(further)) %>%
       select(-further) %>%
       #JZ: There is no price information in CDR Liquids, so remove the quantities
-      filter( !(sector == 'CDR' & carrier =='Liquids') ) %>%
+      filter( !(sector == 'CDR' & carrier =='Liquids'),
+              !region == 'World') %>%
       rename(quantity = value, quantity_unit = unit)
   
   assert_that(nrow(FE_price) == nrow(FE_quantity))
@@ -41,7 +43,7 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     inner_join(FE_price[FE_price$sector =='Transport',],FE_quantity[FE_quantity$sector=='Transport',], 
                by = c("model", "scenario", "region", "sector", "carrier", "period")) %>%
     group_by(model,scenario,region,sector,period, price_unit) %>%
-    summarize( price = sum(price*quantity)/sum(quantity) ) %>%
+    summarise( price = sum(price*quantity)/sum(quantity) ) %>%
     mutate(carrier = 'FE') 
   
   #JZ:Mapping building FE carriers to HH consumption sectors, Electricity and Hydrogen are combined and called electricity,
@@ -53,7 +55,7 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     by = c("model", "scenario", "region", "sector", "carrier", "period")
   ) %>%
     group_by(model, scenario, region, sector, period) %>%
-    summarize(price = sum(price * quantity) / sum(quantity), .groups = "drop") %>%
+    summarise(price = sum(price * quantity) / sum(quantity), .groups = "drop") %>%
     mutate(carrier = "Other fuels",
            price_unit = "US$2017/GJ")
   
@@ -64,7 +66,7 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     by = c("model", "scenario", "region", "sector", "carrier", "period")
   ) %>%
     group_by(model, scenario, region, sector, period) %>%
-    summarize(price = sum(price * quantity) / sum(quantity), .groups = "drop") %>%
+    summarise(price = sum(price * quantity) / sum(quantity), .groups = "drop") %>%
     mutate(carrier = "Electricity",
            price_unit = "US$2017/GJ")
   
@@ -89,11 +91,11 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     rename(quantity = value, quantity_unit = unit)%>%
     mutate(carrier = ifelse(carrier %in% c('Electricity', 'Gases','Hydrogen'), carrier, 'Other fuels')) %>%
     group_by(model,scenario,region,sector,carrier,period, quantity_unit) %>%
-    summarize (quantity = sum(quantity)) %>%
+    summarise (quantity = sum(quantity)) %>%
     ungroup() %>%
     mutate(carrier = ifelse(carrier %in% c('Gases','Other fuels'), carrier, 'Electricity')) %>%
     group_by(model,scenario,region,sector,carrier,period, quantity_unit) %>%
-    summarize (quantity = sum(quantity)) %>%
+    summarise (quantity = sum(quantity)) %>%
     ungroup()%>%
     mutate( variable = paste0( "FE|",sector,'|',carrier ) )%>%
     select(-sector, -carrier) %>%
@@ -104,7 +106,7 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
   # FE_sectorprice <- 
   #   inner_join(FE_price,FE_quantity, by = c("model", "scenario", "region", "sector", "carrier", "period")) %>% 
   #   group_by(model,scenario,region,sector,period, price_unit) %>% 
-  #   summarize(price = sum(price*quantity)/sum(quantity)) %>% 
+  #   summarise(price = sum(price*quantity)/sum(quantity)) %>% 
   #   ungroup() %>% 
   #   mutate(variable = paste0("Price|Final Energy|",sector)) %>% 
   #   select(-sector) %>% 
