@@ -2,10 +2,7 @@
 
 aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decileConsShare, data3 = data, 
                                         level = c("full", "grouped", "total"), region = 'region') {
-  welf = data1 = decileWelfChange
-  data2 = decileConsShare
-  data3 = data
-  
+  welf = data1
   
   pop = data3 %>%
     filter(variable == 'Population') %>%

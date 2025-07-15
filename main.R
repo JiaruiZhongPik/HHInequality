@@ -146,8 +146,8 @@ plot_output(outputPath = outputPath,
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = 'globalWelfBySec',
-            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
+            plotlist = 'regWelfBySec',
+            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
 for(r in c(unique(decileWelfChange$region),'World') ){

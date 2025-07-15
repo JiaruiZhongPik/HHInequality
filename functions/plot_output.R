@@ -11,7 +11,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   numSector <- length(unique(plotdataWelf$category))
   foodSec <- c("Animal products","Empty calories","Fruits vegetables nuts","Staples")
   eneSec <- c("Building electricity", "Building gases", "Building other fuels","Transport energy")
-  
+  allSec <- c(foodSec, eneSec, 'Other commodities','Consumption')
   p=list()
 
 #-------------------------1.Plots all aggregated welfare change------------------------
@@ -827,9 +827,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   if(any(plotlist=='welfByDecileSec')| allExport ){
     
     plotdf <- plotdataWelf %>%
-      filter( period <= 2100,
-              category != 'Other commodities') %>%
-      mutate( category = factor(category, levels = c(eneSec, foodSec)) )
+      filter( period <= 2100) %>%
+      mutate( category = factor(category, levels = allSec ))
 
     
     # Automate over all scenarios
@@ -865,23 +864,28 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, data3 = data3, 
                                          level = c("full"), region = 'global') %>%
-      filter(category != 'Other commodities') %>%
-      mutate(category = factor(category, levels = c(eneSec, foodSec)))
+      mutate(category = factor(category, levels = allSec))
     
     
     # Automate over all scenarios
     p[['globalWelfBySec']] <- list(
       plot = ggplot(plotdf, aes(x = factor(period), y = welfChange, fill = category)) +
-             geom_col(position = "stack") +
-             facet_wrap(~ scenario) +
-             labs(
-                   x = "Year",
-                   y = "Welfare Change (%)",
-                   fill = "Category"
-               ) +
-         theme_minimal() +
-        scale_fill_brewer(palette = "Set2") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1)),
+        geom_col(position = "stack") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+        facet_wrap(~ scenario) +
+        labs(
+          x = "Year",
+          y = "Welfare Change (%)",
+          fill = "Category"
+        ) +
+        theme_minimal() +
+        #scale_fill_paletteer_d("ggprism::floral2") +
+        #scale_fill_paletteer_d("beyonce::X82") +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+        guides(fill = guide_legend(reverse = TRUE))
+      
+      ,
       
       width = 8,
       height = 3
@@ -905,9 +909,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     
     plotdf <- plotdataWelf %>%
       filter( period <= 2100,
-              category != 'Other commodities',
               region == exampleReg) %>%
-      mutate( category = factor(category, levels = c(eneSec, foodSec)))
+      mutate( category = factor(category, levels = allSec))
     
     
     # Automate over all scenarios
@@ -945,15 +948,25 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, data3 = data3, 
                                          level = c("full"), region = 'region') %>%
-      filter(category != 'Other commodities') %>%
-      mutate(category = factor(category, levels = c(eneSec, foodSec)))
+      mutate(category = factor(category, levels = allSec))
     
+
     for(n in unique(plotdf$scenario)) {
+      
+      summary_df <- plotdf %>%
+        filter(scenario == n) %>%
+        group_by(region, period) %>%
+        summarise(total_welfChange = sum(welfChange, na.rm = TRUE), .groups = "drop")
       
       # Automate over all scenarios
       p[[paste0('regWelfBySec',n)]] <- list(
-        plot = ggplot(plotdf[plotdf$scenario==n,], aes(x = factor(period), y = welfChange, fill = category)) +
+        plot = ggplot(plotdf[plotdf$scenario == n,], aes(x = factor(period), y = welfChange, fill = category)) +
           geom_col(position = "stack") +
+          # geom_line(data = summary_df, aes(x = factor(period), y = total_welfChange, group = 1), 
+          #           color = "darkblue", size = 0.4, inherit.aes = FALSE) +
+          geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+          # geom_point(data = summary_df, aes(x = factor(period), y = total_welfChange), 
+          #            color = "black", size = 0.8, inherit.aes = FALSE) +
           facet_wrap(~ region) +
           labs(
             x = "Year",
@@ -961,8 +974,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             fill = "Category"
           ) +
           theme_minimal() +
-          scale_fill_brewer(palette = "Set2") +
-          theme(axis.text.x = element_text(angle = 45, hjust = 1,size= 8)),
+          scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)),
         
         width = 10,
         height = 8
