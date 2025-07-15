@@ -694,7 +694,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
       theme(legend.position = "bottom") 
     
     ggsave(
-      filename = paste0(outputPath,"/combined_food_share_plot_gcd_",countryExample,".tiff"),
+      filename = paste0(outputPath,"/combined_food_share_plot_gcd_",region,".tiff"),
       plot = all_combined_plot,
       width = 10,
       height = 12,

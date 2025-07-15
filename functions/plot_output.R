@@ -1144,6 +1144,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         scale_fill_brewer(palette = "Set2") +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period))+
+        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         labs(
           x = "Year",
@@ -1188,6 +1189,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period))+
         theme_minimal() +
+        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
         labs(
           x = "Year",
           y = "Inequality Change (Theil Index)",

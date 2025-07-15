@@ -214,6 +214,17 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
   }else(print ('Other approach not yet implemented'))
   
   
+  #add real consumption change
+  decileWelfChange <-   decileConsShare %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>%
+    pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
+    mutate(`C_SSP2-PkBudg650` = (`C_SSP2-PkBudg650` /  `C_SSP2-NPi2025` - 1) * 100,
+           `C_SSP2-PkBudg1000` = (`C_SSP2-PkBudg1000` /  `C_SSP2-NPi2025` - 1) * 100  ) %>%
+    select( -`C_SSP2-NPi2025` ) %>%
+    mutate(category = 'consumptionCa') %>%
+    pivot_longer(cols = starts_with('C_SSP2'), names_to = 'scenario', values_to = 'decilWelfChange') %>%
+    bind_rows(decileWelfChange)
+  
   
   
   return(decileWelfChange)

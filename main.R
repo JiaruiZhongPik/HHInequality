@@ -58,6 +58,7 @@ library(ineq)
 library(gtools)
 library(dineq)
 library(acid)
+library(iIneq)
 options(dplyr.summarise.inform = FALSE)
 
 
@@ -89,7 +90,7 @@ all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring,
 
 #Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affectec
 #by smoothing. So I'd only use prices after that for simulation.
-data = prepare_modelData(all_paths) %>% 
+data = prepare_modelData(all_paths,isExport = T) %>% 
   filter(period %notin% c(1995,2000,2005,2010))
 
 
@@ -120,6 +121,7 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 
 ineq<-compute_inequalityMetrics(data1 = decileWelfChange, 
                                  data2 = decileConsShare, 
+                                 data3 = data,
                                  montecarlo = TRUE, n_perms = 300)
 
 
@@ -143,8 +145,9 @@ plot_output(outputPath = outputPath,
             data2 = decileConsShare, 
             data3 = data, 
             plotdataIneq = ineq,
-            plotlist = 'ineqGlobalWithinRegTheilT',
-            micro_model = micro_model, fixed_point = fixed_point, isExport = T)
+            exampleReg = 'IND',
+            plotlist = 'globalWelfBySec',
+            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
 
 #To get all regional plots
 for(r in c(unique(decileWelfChange$region),'World') ){
@@ -154,8 +157,9 @@ for(r in c(unique(decileWelfChange$region),'World') ){
                data2 = decileConsShare, 
                data3 = data, 
                plotdataIneq = ineq,
-               plotlist='ineqRegBySec' , 
-               micro_model = micro_model, fixed_point = fixed_point, exampleReg = r,isDisplay = F, isExport = T)
+               plotlist=c('ineqTheilTRegBySec','ineqTheilLRegBySec') , 
+               micro_model = micro_model, fixed_point = fixed_point, 
+               exampleReg = r,isDisplay = F, isExport = T)
   
 }
 
