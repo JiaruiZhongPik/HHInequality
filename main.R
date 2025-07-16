@@ -14,6 +14,7 @@ source('functions/prepare_gcdData.R')
 source('functions/prepare_giniSDP.R')
 source('functions/analyze_regression.R')
 source('functions/predict_decileConsShare.R')
+source('functions/plot_inspection.R')
 source('functions/predict_decileWelfChange.R')
 source('functions/plot_output.R')
 source('functions/aggregate_decileWelfChange.R')
@@ -110,6 +111,17 @@ if(regression){
  #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
 decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
+
+
+#inspecting intermediate variables, particularly price shock and exposure
+plot_inspection(outputPath = outputPath,
+                dataPrice = data,
+                dataExposure = decileConsShare,
+                plotlist=c('exposureByRegCate'),
+                isDisplay = F, isExport = T, 
+                allExport=FALSE)
+
+
 
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point) # unit %
 

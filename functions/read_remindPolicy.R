@@ -20,6 +20,28 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
   scen_base <- scens[grepl("Base|NPi|npi-base|CP",scens) & !grepl("NPi-CCimp",scens)] #added npi-base and npi-policy to align with the above
   scen_policy <- scens[grepl("1150|1000|900|650|500|Budg|NDC|npi-policy|NPi-CCimp",scens)] #added budget numbers here for use with hybrid runs in SDP review
   
+  Good_price <- 
+    remind_data %>% 
+    filter(grepl("PVP2|Good",variable,fixed = TRUE)) %>% 
+    mutate(variable = "Price|Other commodities") %>%
+    filter(!region == 'World') 
+  
+  
+  Good_price <-   Good_price %>% 
+    mutate( scenario = case_when(scenario == scen_base ~ "base",
+                           scenario == scen_policy ~ "policy")) %>%
+    pivot_wider(names_from = scenario, values_from = value) %>% 
+    mutate(deltPrice = policy/base - 1 ) %>%
+    select(-policy, -base) %>%
+    mutate(variable = "deltPrice|Other commodities",
+           baseline = scen_base,
+           scenario = scen_policy) %>%
+    rename( value = deltPrice ) %>%
+    bind_rows(Good_price)
+
+    
+  
+  
   FE_price <-
     remind_data %>% 
     filter(grepl("Price|Final Energy",variable,fixed = TRUE)) %>% 
@@ -141,20 +163,23 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
   
   remind_data <- bind_rows(remind_data, FE_consumerPrice,  
                            FE_consumerQuantityBuilding,
-                           FE_consumerPriceDelt)
+                           FE_consumerPriceDelt,
+                           Good_price)
   
   
-  remind_data <- 
-    filter(remind_data,
-           variable %in% c('GDP|MER','GDP|PPP','Population',
+  remind_data <- remind_data %>% 
+    filter(variable %in% c('GDP|MER','GDP|PPP','Population',
                            'Consumption',
                            "FE|++|Transport",
                            "FE|Buildings|Other fuels","FE|Buildings|Gases","FE|Buildings|Electricity",
                            "Price|Transport|FE",
                            "Price|Buildings|Other fuels","Price|Buildings|Electricity","Price|Buildings|Gases",
+                           "Price|Other commodities",
                            "deltPrice|Transport|FE",
                            "deltPrice|Buildings|Electricity","deltPrice|Buildings|Gases",
-                           "deltPrice|Buildings|Other fuels"),
+                           "deltPrice|Buildings|Other fuels",
+                           "deltPrice|Other commodities"
+                           ),
            scenario == scen_policy
     ) %>% 
     mutate_at(vars(c(scenario,variable,unit,model)), ~as.character(.))
