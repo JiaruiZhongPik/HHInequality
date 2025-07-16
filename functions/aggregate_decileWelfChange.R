@@ -49,7 +49,8 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decile
         level == "full" ~ category,
         level == "grouped" & category %in% food_cats ~ "Food",
         level == "grouped" & category %in% energy_cats ~ "Energy",
-        level == "grouped" ~ "Other",
+        level == "grouped" & category == "Other commodities" ~ "Other commodities",
+        level == "grouped" & category == "Consumption" ~ "Consumption",
         level == "total" ~ "Total"
       )) %>%
       group_by(scenario, region, decileGroup , period, group) %>%

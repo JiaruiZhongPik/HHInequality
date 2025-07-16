@@ -116,8 +116,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     select(-starts_with("share|")) %>%
     merge( data1, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
     mutate(shock = consumptionCa * decilWelfChange / 100 ) %>%
-    select( -consumptionCa, -decilWelfChange ) %>%
-    filter( category != 'Other commodities' )
+    select( -consumptionCa, -decilWelfChange ) 
   
   dfBase <- data2 %>% 
     select(-starts_with("share|")) 
@@ -213,7 +212,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
 
     
-    dfIneq <- dfIneq %>%
+  dfIneq <- dfIneq %>%
     filter (category =='Total',variable =='ineq|deltTheilT') %>%
     select(-variable, -category) %>%
     rename(deltTheil = value) %>%
@@ -235,7 +234,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     select( - deltTheil, -shapleyRela) %>%
     mutate(variable = 'ineq|deltTheilLShapley') %>%
     rename(value = deltTheilShapley) %>%
-    bind_rows(dfIneq)
+    bind_rows(dfIneq) 
   
 
     

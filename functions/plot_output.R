@@ -16,7 +16,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
 
 #-------------------------1.Plots all aggregated welfare change------------------------
   
-  if(any(plotlist == "welfByDecile") | allExport){
+  if(any(plotlist == "welfByPeriod") | allExport){
     #todo: is using weighted average better?
     
     dataDecile <- plotdataWelf %>%
@@ -30,7 +30,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       
     
     
-    p[['welfByDecile']] <- list(
+    p[['welfByPeriod']] <- list(
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                    aes(x = period, y = sumWelfChange, fill = scenario)) +
         
@@ -89,8 +89,12 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     }
   
   
-  if(any(plotlist == "welfByPeriod") | allExport){
+  if(any(plotlist == "welfByDecile") | allExport){
     
+    dataDecile <- plotdataWelf %>%
+      filter(period <= 2100) %>%
+      group_by(scenario, period, region, decileGroup) %>%
+      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
     
     avg_df_decile <- dataDecile %>%
       group_by(scenario, decileGroup) %>%
@@ -98,7 +102,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       mutate(decileGroup = as.factor(decileGroup)) 
     
     
-    p[['welfByPeriod']] <- list (
+    p[['welfByDecile']] <- list (
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                     aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
         
@@ -148,7 +152,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
 #-----------------------2.1. Plots Ene aggregated(welfare change)---------------
   
-  if(any(plotlist == "welfByDecileEne") | allExport){
+  if(any(plotlist == "welfByPeriodEne") | allExport){
     #todo: is using weighted average better?
     
     dataDecile <- plotdataWelf %>%
@@ -162,7 +166,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
     
     
-    p[['welfByDecileEne']] <- list(
+    p[['welfByPeriodEne']] <- list(
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                     aes(x = period, y = sumWelfChange, fill = scenario)) +
         
@@ -221,7 +225,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   }
   
   
-  if(any(plotlist == "welfByPeriodEne") | allExport){
+  if(any(plotlist == "welfByDecileEne") | allExport){
     
     dataDecile <- plotdataWelf %>%
       filter(period <= 2100,
@@ -235,7 +239,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       mutate(decileGroup = as.factor(decileGroup)) 
     
     
-    p[['welfByPeriod']] <- list (
+    p[['welfByDecile']] <- list (
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                     aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
         
@@ -286,7 +290,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
 #-----------------------2.2. Plots food aggregated(welfare change)--------------
   
-  if(any(plotlist == "welfByDecileEne") | allExport){
+  if(any(plotlist == "welfByPeriodFood") | allExport){
     #todo: is using weighted average better?
     
     dataDecile <- plotdataWelf %>%
@@ -300,7 +304,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
     
     
-    p[['welfByDecileFood']] <- list(
+    p[['welfByPeriodFood']] <- list(
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                     aes(x = period, y = sumWelfChange, fill = scenario)) +
         
@@ -359,7 +363,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   }
   
   
-  if(any(plotlist == "welfByPeriodFood") | allExport){
+  if(any(plotlist == "welfByDecileFood") | allExport){
     
     dataDecile <- plotdataWelf %>%
       filter(period <= 2100,
@@ -373,7 +377,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       mutate(decileGroup = as.factor(decileGroup)) 
     
     
-    p[['welfByPeriod']] <- list (
+    p[['welfByDecileFood']] <- list (
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
                     aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
         
@@ -415,6 +419,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       
     )
   }
+  
 #---------------------End:Plots Ene aggregated----------------------------------  
   
   
@@ -423,6 +428,11 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
 #-------------------------3.reg plots all aggregated(welfare change)------------  
   if(any(plotlist == "welfByDecileReg") | allExport){
+    
+    dataDecile <- plotdataWelf %>%
+      filter(period <= 2100) %>%
+      group_by(scenario, period, region, decileGroup) %>%
+      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
     
     avg_df_decile <- dataDecile %>%
       filter(period <= 2100) %>%
@@ -465,7 +475,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
           legend.direction = "horizontal"
-        ),
+        )
+      ,
       
       width = 10,
       height = 8
@@ -474,7 +485,12 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
   
   if(any(plotlist=='welfByPeriodReg')| allExport ){
-    #todo: is using weighted average better?
+    
+    dataDecile <- plotdataWelf %>%
+      filter(period <= 2100) %>%
+      group_by(scenario, period, region, decileGroup) %>%
+      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
+    
     avg_df_period <- dataDecile %>%
       filter(period <= 2100) %>%
       group_by(scenario, period, region) %>%
@@ -842,7 +858,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         #             position = position_jitterdodge(jitter.width = 1, dodge.width =0.75), 
         #             alpha = 0.3, size = 0.2) +
         #scale_fill_viridis_d(option = "A") +
-        scale_fill_brewer(palette = "Set2") +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
         facet_wrap(~scenario, ncol = 2) +
         # Labels and styling
         labs(x = "Decile", y = "Welfare Change (%)", fill = "FE category") +
@@ -854,8 +870,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           legend.direction = "horizontal"
         ),
       
-      width = 8,
-      height = 3
+      width = 10,
+      height = 5
       
     )
   }
@@ -1142,11 +1158,16 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
               region == exampleReg,
               category != 'Total',
               variable %in% c("ineq|deltTheilTShapley")) %>%
-      mutate(  category = factor(category, levels = c(eneSec, foodSec)) )
-
+      mutate(category = factor(category, levels = allSec))
+    
+    stack_sums <- plotdf %>%
+      group_by(period, scenario) %>%
+      summarise(total = sum(value, na.rm = TRUE), .groups = "drop")
 
     
     p[[paste0('ineqTheilTRegBySec_',exampleReg)]] <- list(
+      
+      
       
       plot = ggplot(plotdf, aes(x = period, y = value, fill = category)) +
         geom_bar(
@@ -1154,10 +1175,10 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           position = position_stack(),
           width = 2
         ) +
-        scale_fill_brewer(palette = "Set2") +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
         scale_x_continuous(breaks = unique(plotdf$period),
-                           labels = unique(plotdf$period))+
-        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
+                           labels = unique(plotdf$period)) +
+        coord_cartesian( ylim = quantile(stack_sums$total, probs = c(0.01, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         labs(
           x = "Year",
@@ -1186,8 +1207,11 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
               region == exampleReg,
               category != 'Total',
               variable %in% c("ineq|deltTheilLShapley")) %>%
-      mutate(  category = factor(category, levels = c(eneSec, foodSec)) )
+      mutate(  category = factor(category, levels = allSec) )
     
+    stack_sums <- plotdf %>%
+      group_by(period, scenario) %>%
+      summarise(total = sum(value, na.rm = TRUE), .groups = "drop")
     
     
     p[[paste0('ineqTheilLRegBySec_',exampleReg)]] <- list(
@@ -1198,11 +1222,11 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           position = position_stack(),
           width = 2
         ) +
-        scale_fill_brewer(palette = "Set2") +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period))+
         theme_minimal() +
-        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
+        coord_cartesian( ylim = quantile(stack_sums$total, probs = c(0.01, 0.99), na.rm = TRUE)) +
         labs(
           x = "Year",
           y = "Inequality Change (Theil Index)",
@@ -1236,9 +1260,11 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
                 region != 'World',
                 category != 'Total',
                 variable %in% c("ineq|deltTheilLShapley")) %>%
-        mutate(  category = factor(category, levels = c(eneSec, foodSec)) )
+        mutate(  category = factor(category, levels = allSec) )
       
-      
+      stack_sums <- plotdf %>%
+        group_by(period, scenario, region) %>%
+        summarise(total = sum(value, na.rm = TRUE), .groups = "drop")
       
       p[[paste0('ineqTheilLRegBySec_',scen)]] <- list(
         
@@ -1248,7 +1274,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             position = position_stack(),
             width = 2
           ) +
-          scale_fill_brewer(palette = "Set2") +
+          scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+          
           scale_x_continuous(breaks = unique(plotdf$period),
                              labels = unique(plotdf$period))+
           theme_minimal() +
@@ -1257,7 +1284,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             y = "Inequality Change (Theil Index)",
             fill = "Category",
           ) +
-          coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
+          coord_cartesian( ylim = quantile(stack_sums$total, probs = c(0.01, 0.99), na.rm = TRUE)) +
           theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
           facet_wrap(~region, ncol = 3)
         ,
@@ -1410,7 +1437,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
   
     #Regional contribution to within region theil index
-    if(any(plotlist == 'ineqGlobalWithinRegTheilT' | allExport  )){
+  if(any(plotlist == 'ineqGlobalWithinRegTheilT' | allExport  )){
       
       plotdf <- plotdataIneq[['theilTDecomp']]%>%
         mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,

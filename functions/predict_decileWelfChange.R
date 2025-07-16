@@ -74,18 +74,11 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
         max(value[is.finite(value)], na.rm = TRUE),
         value
       )) %>%
-      ungroup() 
-    
-    
-    deltPrice <- deltPrice %>%
-      bind_rows(  deltPrice %>% 
-                    filter( variable == 'deltPrice|Building electricity' ) %>%
-                    mutate( value = 0,
-                            variable = 'deltPrice|Other commodities')
-                      )  %>%
+      ungroup() %>%
       separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
       select( -variable ) %>%
       rename( deltPrice = value )
+
 
   }
   

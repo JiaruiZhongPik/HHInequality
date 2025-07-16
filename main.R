@@ -81,7 +81,7 @@ ConsData <- 'gcd'                           #options are: gcd (9 sectors), euros
 gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- "figure/test/s9"
+outputPath <- "figure/test/s10"
 
 
 
@@ -117,7 +117,7 @@ decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDispl
 plot_inspection(outputPath = outputPath,
                 dataPrice = data,
                 dataExposure = decileConsShare,
-                plotlist=c('exposureByRegCate'),
+                plotlist=c('shock'),
                 isDisplay = F, isExport = T, 
                 allExport=FALSE)
 
@@ -138,9 +138,8 @@ ineq<-compute_inequalityMetrics(data1 = decileWelfChange,
 
 
 #validate the theil combiled in total and decomposed
-#ineq[['theilDecomp']] %>% group_by(scenario, period) %>% summarise(theil= sum(Tt.i))
-#ineq[['ineq']]%>%filter(category == 'Total', variable =='ineq|TheilPost', region=='World')
-
+#ineq[['theilLDecomp']] %>% group_by(scenario, period) %>% dplyr::summarize(theil = sum(Tl.i, na.rm = TRUE), .groups = "drop")
+#ineq[['ineq']] %>% filter(category == 'Total', variable =='ineq|TheilLPost', region=='World')
 
 #-------Plot-------
 #all plots
@@ -158,7 +157,7 @@ plot_output(outputPath = outputPath,
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = 'regWelfBySec',
+            plotlist = 'welfByDecileRegEne',
             micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
