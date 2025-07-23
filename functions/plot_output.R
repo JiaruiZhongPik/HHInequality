@@ -939,7 +939,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         # geom_jitter(aes(color = category),
         #             position = position_jitterdodge(jitter.width = 1, dodge.width =0.75), 
         #             alpha = 0.3, size = 0.2) +
-        scale_fill_brewer(palette = "Set2") +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
         facet_wrap(~scenario, ncol = 2) +
         # Labels and styling
         labs(x = "Decile", y = "Welfare Change (%)", fill = "FE category") +

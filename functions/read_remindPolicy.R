@@ -20,14 +20,19 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
   scen_base <- scens[grepl("Base|NPi|npi-base|CP",scens) & !grepl("NPi-CCimp",scens)] #added npi-base and npi-policy to align with the above
   scen_policy <- scens[grepl("1150|1000|900|650|500|Budg|NDC|npi-policy|NPi-CCimp",scens)] #added budget numbers here for use with hybrid runs in SDP review
   
+  #JZ: PVP|good is the shadow price not the relative price of other commodities.
+  #As the macro output is assumed to be the numeraire good, it's price by assumption
+  #As the nominal price of numeraire good is not reported, it is set to 1 manually here
   Good_price <- 
     remind_data %>% 
     filter(grepl("PVP2|Good",variable,fixed = TRUE)) %>% 
-    mutate(variable = "Price|Other commodities") %>%
-    filter(!region == 'World') 
+    mutate(variable = "Price|Other commodities",
+           value = 1) %>%
+    filter(!region == 'World')
+    
   
   
-  Good_price <-   Good_price %>% 
+  Good_price <-  Good_price %>% 
     mutate( scenario = case_when(scenario == scen_base ~ "base",
                            scenario == scen_policy ~ "policy")) %>%
     pivot_wider(names_from = scenario, values_from = value) %>% 

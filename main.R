@@ -60,6 +60,7 @@ library(gtools)
 library(dineq)
 library(acid)
 library(iIneq)
+library(paletteer)
 options(dplyr.summarise.inform = FALSE)
 
 
@@ -81,7 +82,7 @@ ConsData <- 'gcd'                           #options are: gcd (9 sectors), euros
 gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- "figure/test/s10"
+outputPath <- paste0("figure/test/",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 
 
@@ -157,7 +158,7 @@ plot_output(outputPath = outputPath,
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = 'welfByDecileRegEne',
+            plotlist = 'welfByDecileSecReg',
             micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
