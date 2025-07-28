@@ -75,14 +75,14 @@ all_budgets <- c("PkBudg650", "PkBudg1000")
 REMIND_pattern <- "REMIND_generic*.mif"
 
 #Modelling setting
-regression <- 1                             ## if estimate coefficients within the project
+regression <- 1                             ## 1 if coefficients needs to be estimated. 
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
 regionmapping <- 'pool'                      #options are: "H12", "H21", "country", "pool"
 ConsData <- 'gcd'                           #options are: gcd (9 sectors), eurostat(3 sectors)
-gini_baseline <- 'raoGini'                  ##iiasaGini or raoGini
+gini_baseline <- 'iiasaGini'                  ##iiasaGini or raoGini
 fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- paste0("figure/test/",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/iiasaGini",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 
 
@@ -118,9 +118,8 @@ decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDispl
 plot_inspection(outputPath = outputPath,
                 dataPrice = data,
                 dataExposure = decileConsShare,
-                plotlist=c('shock'),
                 isDisplay = F, isExport = T, 
-                allExport=FALSE)
+                allExport=T)
 
 
 
@@ -162,17 +161,17 @@ plot_output(outputPath = outputPath,
             micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
-for(r in c(unique(decileWelfChange$region),'World') ){
-  
-  plot_output( outputPath = outputPath, 
-               plotdataWelf = decileWelfChange, 
-               data2 = decileConsShare, 
-               data3 = data, 
-               plotdataIneq = ineq,
-               plotlist=c('ineqTheilTRegBySec','ineqTheilLRegBySec') , 
-               micro_model = micro_model, fixed_point = fixed_point, 
-               exampleReg = r,isDisplay = F, isExport = T)
-  
-}
+# for(r in c(unique(decileWelfChange$region),'World') ){
+#   
+#   plot_output( outputPath = outputPath, 
+#                plotdataWelf = decileWelfChange, 
+#                data2 = decileConsShare, 
+#                data3 = data, 
+#                plotdataIneq = ineq,
+#                plotlist=c('ineqTheilTRegBySec','ineqTheilLRegBySec') , 
+#                micro_model = micro_model, fixed_point = fixed_point, 
+#                exampleReg = r,isDisplay = F, isExport = T)
+#   
+# }
 
 

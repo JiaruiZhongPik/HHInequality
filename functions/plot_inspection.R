@@ -185,6 +185,9 @@ plot_inspection <- function( outputPath,
   
   
   if(isExport|allExport){
+    
+    dir.create(paste0(outputPath,"/inspection"), recursive = TRUE, showWarnings = FALSE)
+    
     for (name in names(p)) {
       ggsave(
         filename = paste0(outputPath,"/inspection/", name, ".tiff"),

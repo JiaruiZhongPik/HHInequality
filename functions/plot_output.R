@@ -1586,6 +1586,9 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
   
   if(isExport|allExport){
+    
+    dir.create(paste0(outputPath,'/', micro_model, capitalize_first(fixed_point)), recursive = TRUE, showWarnings = FALSE)
+    
     for (name in names(p)) {
       ggsave(
         filename = paste0(outputPath,'/', micro_model, capitalize_first(fixed_point),"/", name, ".tiff"),

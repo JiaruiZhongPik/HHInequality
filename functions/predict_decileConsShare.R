@@ -23,7 +23,7 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
   
   
   #Read Gini for SSPs
-  shareSSP <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE)%>%
+  shareSSP <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE) %>%
     rename( period = V1,
             region = V2,
             scenario = V3,

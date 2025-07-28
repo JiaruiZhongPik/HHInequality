@@ -202,6 +202,8 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     print(p0)
   }
   if(isExport){
+    
+    dir.create(outputPath, recursive = TRUE, showWarnings = FALSE)
     ggsave(paste0(outputPath,'/Energy price changes to Baseline (NPi)',str_extract(remind_run, "PkBudg[^-]+"),'.tiff'),p0 , width = 6, height =5, units = "in", dpi = 300 )
   }
   
