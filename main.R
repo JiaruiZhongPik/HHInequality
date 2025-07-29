@@ -61,7 +61,8 @@ library(dineq)
 library(acid)
 library(iIneq)
 library(paletteer)
-options(dplyr.summarise.inform = FALSE)
+options(dplyr.summarise.inform = FALSE,
+        scipen = 999)
 
 
 #Config setting

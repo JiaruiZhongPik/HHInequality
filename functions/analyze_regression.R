@@ -130,7 +130,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
             formula <- as.formula(paste0("`", col, "` ~ log(exp) + I(log(exp)^2) + geo"))
           }
           
-          model <- lm(formula, data = region_df)
+          model <- lm(formula, data = region_df, weights = pop)
           
           tidy(model) %>%
             mutate(share = col, region = region_name)
@@ -171,7 +171,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
           }
           
           # Fit model
-          model <- lm(formula, data = region_df)
+          model <- lm(formula, data = region_df, weights = pop)
           
           tidy(model) %>%
             mutate(share = col, region = region_name)
