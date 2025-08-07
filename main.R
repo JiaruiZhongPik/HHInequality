@@ -7,6 +7,7 @@ source('functions/read_magpiePrice.R')
 source('functions/read_magpieExpShare.R')
 source('functions/read_magpiePolicy.R')
 source('functions/read_magpieBase.R')
+source('functions/get_estimateMcc.R')
 source('functions/analyze_regression.R')
 source('functions/prepare_modelData.R')
 source('functions/prepare_eurostatData.R')
@@ -65,6 +66,9 @@ options(dplyr.summarise.inform = FALSE,
         scipen = 999)
 
 
+outputPath <- paste0("figure/test/",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+
+
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
@@ -76,14 +80,14 @@ all_budgets <- c("PkBudg650", "PkBudg1000")
 REMIND_pattern <- "REMIND_generic*.mif"
 
 #Modelling setting
-regression <- 1                             ## 1 if coefficients needs to be estimated. 
+regions <- 'H12'                            # options are H12 or H21 
+regression <- 1                             # 1 if coefficients needs to be estimated. 
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
-regionmapping <- 'pool'                      #options are: "H12", "H21", "country", "pool"
-ConsData <- 'gcd'                           #options are: gcd (9 sectors), eurostat(3 sectors)
-gini_baseline <- 'iiasaGini'                  ##iiasaGini or raoGini
-fixed_point <- 'midpoint'                   ## options: "base","policy","midpoint"
+regionmapping <- 'pool'                     # options are: "H12", "H21", "country", "pool"
+ConsData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors)
+gini_baseline <- 'iiasaGini'                # iiasaGini or raoGini
+fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
-outputPath <- paste0("figure/test/iiasaGini",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 
 
@@ -101,7 +105,9 @@ if(regression){
   coef = analyze_regression(regression_model = regression_model, ConsData = ConsData, regionmapping = regionmapping,
                             isDisplay = TRUE, isExport = T)
 } else {
-  print('Wait for MCC input')
+  
+  coef = get_estimateMcc(regions = regions)
+  
 }
 
 #uses gcd regional results, there are missing data for developed world. 

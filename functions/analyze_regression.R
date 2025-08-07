@@ -84,13 +84,23 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
     
     dfRaw = prepare_gcdData(isDisplay,isExport)
     
+
+    pop = calcOutput("Population",aggregate = F, scenario = 'SSP1', year = 2010, round = 8) %>%
+      as.data.frame() %>% 
+      select(-Cell, -Data1) %>%
+      mutate(Year = 2010) %>%
+      rename(geo = Region,
+             pop = Value,
+             year = Year)
+    
     hhConsData <- dfRaw %>%
       select(-unit) %>%
-      pivot_wider(names_from = variable, values_from = value)
+      pivot_wider(names_from = variable, values_from = value) %>%
+      left_join(pop, by=c('geo', 'year'))
     
     
     if (regionmapping == 'country'){
-      hhConsData <- hhConsData %>%
+      hhConsData <- hhConsData %>%f
         mutate(region = geo)
     } else if (regionmapping =='pool'){
       hhConsData <- hhConsData %>%
@@ -220,4 +230,4 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
 }
 
 
-
+#-------------------------Data coverage check-----------------------------------

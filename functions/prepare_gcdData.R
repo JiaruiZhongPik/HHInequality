@@ -87,17 +87,24 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
             summarise(value = sum(value, na.rm = TRUE), .incomegroup = "drop") )
   
   #merge consumption expenditure data
-  dfFinal <- dfRaw %>%
+  dfExp <- dfRaw %>%
     filter( variable == 'Annual expenditure, per capita',
             area == 'National', # Remove the Rural/Urban devision that we don't need
             incomegroup %in% c('Low','Higher','Lowest','Middle'),
-            unit =='PPP$') %>%
+            unit =='US$ (mean 2010 exchange rate)') %>%
     mutate(variable = 'exp') %>%
     filter(
       !is.na(value),
       !countryname %in% setdiff(dpCountryName, c('Brazil', 'India', 'South Africa'))
     ) %>%
     select( -area, - countryname, -coicop) %>%
+    GDPuc::convertGDP(unit_in = "constant 2010 US$MER", 
+                      unit_out = "constant 2017 US$MER",
+                      verbose = F) %>%
+    mutate(unit='constant 2017 US$MER') 
+    
+    
+    dfFinal <- dfExp %>%
     bind_rows(dfH) 
   
   
@@ -136,6 +143,9 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
   }
   
   if(isExport){
+    
+    dir.create(paste0(outputPath), recursive = TRUE, showWarnings = FALSE)
+    
     ggsave(
       filename = paste0(outputPath,"/gdc_coverage_map.png"),  # or .pdf / .svg
       plot = plotCoverage,               # or replace with your plot object
