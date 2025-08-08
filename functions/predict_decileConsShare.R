@@ -1,6 +1,6 @@
 # This simulates for HH welfare change given known price changes.
 
-predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOLS', missingMapping = NA, countryExample = NA, 
+predict_decileConsShare <- function(data, coef, gini_baseline, regression_model = 'logitTransOLS', missingMapping = NA, countryExample = NA, 
                                     isDisplay = FALSE, isExport = FALSE){
   #TODO: Future food expenditure needs to be added
   
@@ -21,17 +21,47 @@ predict_decileConsShare <- function(data, coef, regression_model = 'logitTransOL
                     "share|Transport energy" = "`FE|++|Transport` * `Price|Transport|FE`/ `Consumption`"
                      )
   
+  #Todo: maybe worth to add readCons to mrremind, so this can be computed directly
+  if(gini_baseline == 'rao'){
+    #Read Gini for SSPs
+    shareSSP <- read.csv(paste0('input/f_consShare_',regions,'_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE) %>%
+      rename( period = V1,
+              region = V2,
+              scenario = V3,
+              decileGroup = V4,
+              consShare = V5) %>%
+      mutate( gdp_scenario =   gsub("^gdp_", "", scenario)) %>%
+      select( -scenario ) %>%
+      filter(grepl("^SSP[0-9]$", gdp_scenario))
+  } else if(gini_baseline == 'poblete05'){
+    
+    shareSSP <- read.csv(paste0('input/f_consShare_',regions,'_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE) %>%
+      rename( period = V1,
+              region = V2,
+              scenario = V3,
+              decileGroup = V4,
+              consShare = V5) %>%
+      mutate( gdp_scenario =   gsub("^gdp_", "", scenario)) %>%
+      select( -scenario ) %>%
+      filter(grepl("^SSP[0-9]$", gdp_scenario))
+    
+  } else if(gini_baseline == 'poblete07'){
+    
+    shareSSP <- read.csv(paste0('input/f_consShare_',regions,'_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE) %>%
+      rename( period = V1,
+              region = V2,
+              scenario = V3,
+              decileGroup = V4,
+              consShare = V5) %>%
+      mutate( gdp_scenario =   gsub("^gdp_", "", scenario)) %>%
+      select( -scenario ) %>%
+      filter(grepl("^SSP[0-9]$", gdp_scenario))
+    
+    
+  } else{
+    print('no Gini baseline')
+    }
   
-  #Read Gini for SSPs
-  shareSSP <- read.csv(paste0('input/f_consShare_H12_',gini_baseline,'.cs4r' ), skip = 6, header = FALSE) %>%
-    rename( period = V1,
-            region = V2,
-            scenario = V3,
-            decileGroup = V4,
-            consShare = V5) %>%
-    mutate( gdp_scenario =   gsub("^gdp_", "", scenario)) %>%
-    select( -scenario ) %>%
-    filter(grepl("^SSP[0-9]$", gdp_scenario))
   
   #Read Gini for SDPs, from Min et al.(2024)
   #Note: 1) the shape data use older SSP1 data, therefore the inequality measure computed from Shape data

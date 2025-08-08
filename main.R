@@ -66,8 +66,6 @@ options(dplyr.summarise.inform = FALSE,
         scipen = 999)
 
 
-outputPath <- paste0("figure/test/",format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
-
 
 #Config setting
 scenario_mode <- "coupled"
@@ -85,17 +83,19 @@ regression <- 1                             # 1 if coefficients needs to be esti
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
 regionmapping <- 'pool'                     # options are: "H12", "H21", "country", "pool"
 ConsData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors)
-gini_baseline <- 'iiasaGini'                # iiasaGini or raoGini
+gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
 
 
 
+outputPath <- paste0("figure/test/",gini_baseline,'_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
                              REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
-#Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affectec
+#Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affected
 #by smoothing. So I'd only use prices after that for simulation.
 data = prepare_modelData(all_paths,isExport = T) %>% 
   filter(period %notin% c(1995,2000,2005,2010))
@@ -118,7 +118,7 @@ if(regression){
  #   missing = c('CAZ', 'JPN', 'USA'),
  #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-decileConsShare <- predict_decileConsShare(data, coef, regression_model, isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
+decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 
 
 #inspecting intermediate variables, particularly price shock and exposure
