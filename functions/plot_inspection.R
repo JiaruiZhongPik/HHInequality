@@ -10,7 +10,7 @@ plot_inspection <- function( outputPath,
                              isDisplay = T, isExport = FALSE, 
                              allExport=FALSE ) {
  
-  p <- list()
+    p <- list()
   
   #-------------------1. inspecting price shocks--------------------------------
   if(any(plotlist == "shock") | allExport){
@@ -173,9 +173,54 @@ plot_inspection <- function( outputPath,
   #----------------End. inspecting price shocks---------------------------
   
   
+  #------4. inspecting exposure/expnditure share by region and category---------
+    if(any(plotlist == "revenue") | allExport){
+      
+      
+      plotdf <- dataPrice %>% 
+        filter (grepl("^Taxes", variable)) %>%
+        mutate(variable = str_remove(variable, "^Taxes\\|"))
+      
+      for(scen in unique(plotdf$scenario)){
+        
+        plotdf1 <- plotdf %>%
+          filter( scenario == scen )
+        
+        p[[paste0('shock', scen)]] <- list(
+          plot = ggplot(plotdf1 %>% filter(variable %in% c("GHGenergy|REMIND","GHGenergy|MAGPIE")), 
+                        aes(x = period, y = value, color = variable, linetype = variable)) +
+            geom_line(linewidth = 1) +
+            facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot
+            scale_color_paletteer_d("ggthemes::Classic_10") +
+            labs(
+              x = "Year",
+              y = "Value",
+              color = "Variable",
+              linetype = "Scenario"
+            ) +
+            theme_minimal() +
+            theme(
+              legend.position = "bottom",
+              axis.text.x = element_text(angle = 45, hjust = 1),
+              strip.text = element_text(face = "bold")
+            )
+          
+          ,
+          
+          width = 10,
+          height = 8
+          
+        )
+        
+      }
+      
+      
+      
+      
+      
+    }
   
-  
-  
+  #-----End. inspecting exposure/expnditure share by region and category---------
   
   #--------------------Export--------------------------------------------
   if(isDisplay){

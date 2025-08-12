@@ -155,21 +155,31 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     select(-sector, -carrier) %>%
     rename(unit = quantity_unit, value = quantity)
   
-  
-  # #used to compute final energy service price 
-  # FE_sectorprice <- 
-  #   inner_join(FE_price,FE_quantity, by = c("model", "scenario", "region", "sector", "carrier", "period")) %>% 
-  #   group_by(model,scenario,region,sector,period, price_unit) %>% 
-  #   summarize(price = sum(price*quantity)/sum(quantity)) %>% 
-  #   ungroup() %>% 
-  #   mutate(variable = paste0("Price|Final Energy|",sector)) %>% 
-  #   select(-sector) %>% 
-  #   rename(unit = price_unit, value = price)
+  #Tax revenue 
+  Tax_remind = 
+  remind_data %>% 
+  calc_addVariable(
+    "`Taxes|EmiC02FFI`" = "`Emi|CO2|Energy and Industrial Processes`*1e6 * `Price|Carbon`/ 1e9",
+    # taxes from non-LU CH4 (in Mt CH4) and N2O (in kt N2O) emissions
+    "`Taxes|EmiCH4Energy`" = "(`Emi|CH4|+|Energy Supply` + `Emi|CH4|+|Extraction`)*1e6 * 28 * `Price|Carbon`/1e9",
+    "`Taxes|EmiN2OEnergy`" = "(`Emi|N2O|+|Energy Supply` + `Emi|N2O|+|Industry` + `Emi|N2O|+|Transport`) *1e3 * 265 * `Price|Carbon`/1e9",
+    "`Taxes|GHGenergy|REMIND`" = "`Taxes|EmiC02FFI` + `Taxes|EmiCH4Energy` + `Taxes|EmiN2OEnergy`",
+    # LUC revenues are not used for redistribution, so don't need these
+    # "`Taxes|EmiCO2LUC`" = "`Emi|CO2|Land-Use Change`*1e6 * `Price|Carbon`/ 1e9",
+    # "`Taxes|EmiCO2LUC|Rel`" = "`Taxes|EmiCO2LUC`/`GDP|MER|Base`",
+    units = c(
+      "billion US$2017/yr","billion US$2017/yr","billion US$2017/yr","billion US$2017/yr"
+    ))  %>%
+    filter(variable %in% c('Taxes|EmiC02FFI','Taxes|EmiCH4Energy','Taxes|EmiN2OEnergy','Taxes|GHGenergy|REMIND'))%>%
+    mutate(value = pmax(value, 0)) # remove negative revenues
+    
+
   
   remind_data <- bind_rows(remind_data, FE_consumerPrice,  
                            FE_consumerQuantityBuilding,
                            FE_consumerPriceDelt,
-                           Good_price)
+                           Good_price,
+                           Tax_remind)
   
   
   remind_data <- remind_data %>% 
@@ -183,7 +193,11 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
                            "deltPrice|Transport|FE",
                            "deltPrice|Buildings|Electricity","deltPrice|Buildings|Gases",
                            "deltPrice|Buildings|Other fuels",
-                           "deltPrice|Other commodities"
+                           "deltPrice|Other commodities",
+                           'Taxes|EmiC02FFI',
+                           'Taxes|EmiCH4Energy',
+                           'Taxes|EmiN2OEnergy',
+                           'Taxes|GHGenergy|REMIND'
                            ),
            scenario == scen_policy
     ) %>% 

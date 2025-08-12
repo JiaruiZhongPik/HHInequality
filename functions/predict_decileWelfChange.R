@@ -219,7 +219,32 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
     bind_rows(decileWelfChange)
   
   
-  
+  #add lump sum recycling
+  transferCa <-   data1 %>%
+    filter(variable %in% c('Taxes|GHGenergy|MAGPIE','Taxes|GHGenergy|REMIND','Population'),
+           scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
+           region != 'World') %>%
+    select(-model, -baseline) %>%
+    calc_addVariable(
+      "`Taxes|GHGenergy`" = "`Taxes|GHGenergy|MAGPIE` + `Taxes|GHGenergy|REMIND`",
+      "transferCa" = "`Taxes|GHGenergy` * 1e3 / `Population`" ,
+      units = c('billion US$2017/yr', 'US$2017/person/yr')
+    ) %>%
+    filter(variable == 'transferCa') %>%
+    select(-variable, -unit) %>%
+    rename(transferCa = value)
+
+  decileWelfChange <-
+  data2 %>%
+    filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
+           region != 'World') %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>%
+    left_join(transferCa,by = c('scenario', 'region', 'period')) %>%
+    mutate(decilWelfChange = transferCa / consumptionCa *100,
+           category = 'Transfer') %>%
+    select(-consumptionCa, -transferCa) %>%
+    bind_rows(decileWelfChange)
+    
   return(decileWelfChange)
   
 }

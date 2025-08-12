@@ -4,7 +4,11 @@
 
 plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
   
+  plotdataWelfWithTransf <- plotdataWelf %>%
+    filter( period %notin% c(2015,2010,2020,2025))
+  
   plotdataWelf <- plotdataWelf %>%
+    filter(category != 'Transfer') %>%
     filter( period %notin% c(2015,2010,2020,2025))
 
   
@@ -878,7 +882,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
   if(any(plotlist=='globalWelfBySec')| allExport ){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, data3 = data3, 
+    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
                                          level = c("full"), region = 'global') %>%
       mutate(category = factor(category, levels = allSec))
     
@@ -962,7 +966,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   
   if(any(plotlist == 'regWelfBySec' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, data3 = data3, 
+    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
                                          level = c("full"), region = 'region') %>%
       mutate(category = factor(category, levels = allSec))
     
@@ -1060,6 +1064,45 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     
       
   }
+  
+  
+  
+  if(any(plotlist == 'ineqWorldWithTransf' | allExport  )){
+    
+    plotdf <- plotdataIneq[['ineq']] %>%
+      filter( period <= 2100,
+              region == 'World',
+              category %in% c('Total', 'TotalWithTransf'),
+              startsWith(variable, "ineq|delt")) 
+    
+    # Automate over all scenarios
+    p[['ineqWorldWithTransf']] <- list(
+      
+      plot = ggplot(plotdf, 
+                    aes(x = period, y = value, color = variable, linetype = category)) +
+        geom_line() + 
+        scale_fill_brewer(palette = "Set2") +
+        facet_wrap(~scenario, ncol = 2) +
+        # Labels and styling
+        labs(x = "Decile", y = "Inequality metrics", fill = "FE category") +
+        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
+        scale_color_brewer(palette = "Set2") +
+        theme_minimal() +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        ),
+      
+      width = 8,
+      height = 3
+      
+    )
+    
+    
+    
+  }
+  
   
 #-----------------End 5.1 global inequality effect (Gini/Theil)----------------
 

@@ -83,7 +83,7 @@ regression <- 1                             # 1 if coefficients needs to be esti
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
 regionmapping <- 'pool'                     # options are: "H12", "H21", "country", "pool"
 ConsData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors)
-gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
+gini_baseline <- 'poblete07'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
 
@@ -138,7 +138,7 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 # write.csv(out, 'result.csv')
 
 
-ineq<-compute_inequalityMetrics(data1 = decileWelfChange, 
+ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
                                  data2 = decileConsShare, 
                                  data3 = data,
                                  montecarlo = TRUE, n_perms = 300)

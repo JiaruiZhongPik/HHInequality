@@ -6,8 +6,8 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   result <- list()
   
-  #Compute the post inequality metrics (all channels included)
-  welfByDecile <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, level = c("total"), region = 'decile')
+  #--------Compute the post inequality metrics (all channels included)-----------
+  welfByDecile <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("total"), region = 'decile')
   
   pop <- data3 %>%filter(variable == 'Population') %>% select(-unit,-variable,-baseline, -model) %>%
     rename(population = value)
@@ -28,7 +28,6 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
       `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
       `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      
       
       .groups = "drop"
     ) %>%
@@ -51,6 +50,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       `ineq|GiniPost` = weighted.gini(consumptionCaPost, population)[['Gini']],
       `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
       `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
+      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
       `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
       `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
       .groups = "drop"
@@ -63,8 +63,66 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   
-  #Compute post inequality metrics for categorical impacts
-  welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, level = c("full"), region = 'decile')
+  #--------Compute the post inequality metrics (all channels included and with Transfer)-----------
+  welfByDecileTransf <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("totalWithTransf"), region = 'decile')
+  
+  
+  #Compute the prior and post inequality metrics over all categories
+  dfIneq <- data2 %>% 
+    select(-starts_with("share|")) %>%
+    merge(   welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    group_by(scenario, region, period) %>%
+    summarise(
+      `ineq|Gini` = Gini(consumptionCa),
+      `ineq|TheilT` = compute_theil.wtd(consumptionCa, type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCa, type = 'L'),
+      `ineq|GiniPost` = Gini(consumptionCaPost),
+      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
+      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
+      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
+      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
+      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
+      
+      .groups = "drop"
+    ) %>%
+    mutate (category = 'TotalWithTransf')%>%
+    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
+    bind_rows(dfIneq)
+  
+  
+  #Compute the world inequality metrics
+  dfIneq <- data2 %>% 
+    select(-starts_with("share|")) %>%
+    merge( welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    merge(pop, by = c('scenario','region','period')) %>%
+    mutate(population = population/10) %>%
+    group_by(scenario, period) %>%
+    summarise(
+      `ineq|Gini` = weighted.gini(consumptionCa, population)[['Gini']],
+      `ineq|TheilT` = compute_theil.wtd(consumptionCa, population,type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCa, population,type = 'L'),
+      `ineq|GiniPost` = weighted.gini(consumptionCaPost, population)[['Gini']],
+      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
+      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
+      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
+      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
+      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
+      .groups = "drop"
+    ) %>%
+    mutate (category = 'TotalWithTransf',
+            region = 'World')%>%
+    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
+    bind_rows(dfIneq)
+  
+  
+  
+  
+  
+  
+  #-----------Compute post inequality metrics for categorical impacts-----------
+  welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("full"), region = 'decile')
   
   
   dfIneq <- data2 %>% 
@@ -79,6 +137,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       `ineq|GiniPost` = Gini(consumptionCaPost),
       `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
       `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, type = 'L'),
+      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
       `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
       `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
       .groups = "drop"
@@ -100,6 +159,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       `ineq|GiniPost` = Gini(consumptionCaPost),
       `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
       `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
+      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
       `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
       `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
       .groups = "drop"
@@ -112,9 +172,12 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   #Compute channel-wise shock
   
+  
+  
+  
   dfShock <- data2 %>% 
     select(-starts_with("share|")) %>%
-    merge( data1, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    merge( data1 %>% filter(category != 'Transfer'), by = c('scenario', 'region', 'period', 'decileGroup')) %>%
     mutate(shock = consumptionCa * decilWelfChange / 100 ) %>%
     select( -consumptionCa, -decilWelfChange ) 
   
