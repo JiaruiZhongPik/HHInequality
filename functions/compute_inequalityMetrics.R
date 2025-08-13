@@ -6,17 +6,46 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   result <- list()
   
+  mapping <- all_paths %>%
+    select( remind_run, remind_base ) %>%
+    mutate(
+      remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
+      remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
+    )
+  
+  consBase <- data2 %>%
+    filter(
+      scenario %in% 
+        (all_paths$remind_base %>% 
+           str_remove("-(rem|mag)-\\d+$") %>% 
+           unique())
+    ) %>%
+    select(-starts_with("share|")) %>%
+    rename( remind_base = scenario)
+    
+  consBase <- data2 %>%
+    select(-starts_with("share|"), -consumptionCa) %>%
+    filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%
+    left_join( mapping, by= c('scenario'= 'remind_run')) %>%
+    merge(consBase, by = c("region", "period", "decileGroup", "remind_base")) %>%
+    select(-remind_base)
+
+  
+
+
+
   #--------Compute the post inequality metrics (all channels included)-----------
+  #get the total log points change
   welfByDecile <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("total"), region = 'decile')
   
   pop <- data3 %>%filter(variable == 'Population') %>% select(-unit,-variable,-baseline, -model) %>%
     rename(population = value)
   
+
   #Compute the prior and post inequality metrics over all categories
-  dfIneq <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfIneq <- consBase %>%
     merge( welfByDecile, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa *  exp(welfChange/100) ) %>%
     group_by(scenario, region, period) %>%
     summarise(
       `ineq|Gini` = Gini(consumptionCa),
@@ -36,10 +65,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   #Compute the world inequality metrics
-  dfIneq <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfIneq <- consBase %>%
     merge( welfByDecile, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c('scenario','region','period')) %>%
     mutate(population = population/10) %>%
     group_by(scenario, period) %>%
@@ -66,12 +94,10 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   #--------Compute the post inequality metrics (all channels included and with Transfer)-----------
   welfByDecileTransf <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("totalWithTransf"), region = 'decile')
   
-  
-  #Compute the prior and post inequality metrics over all categories
-  dfIneq <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  #Compute the prior and post inequality metrics over all categories for each region
+  dfIneq <- consBase %>%
     merge(   welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     group_by(scenario, region, period) %>%
     summarise(
       `ineq|Gini` = Gini(consumptionCa),
@@ -92,10 +118,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   #Compute the world inequality metrics
-  dfIneq <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfIneq <- consBase %>%
     merge( welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c('scenario','region','period')) %>%
     mutate(population = population/10) %>%
     group_by(scenario, period) %>%
@@ -125,10 +150,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, level = c("full"), region = 'decile')
   
   
-  dfIneq <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfIneq <- consBase %>%
     merge( welfByDecileSec, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     group_by(scenario, region, period, category) %>%
     summarise(
       `ineq|Gini` = Gini(consumptionCa),
@@ -145,10 +169,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
     bind_rows(dfIneq)
   
-  dfIneq <-  data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfIneq <-  consBase %>%
     merge( welfByDecileSec, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange/100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c('scenario','region','period')) %>%
     mutate(population = population/10) %>%
     group_by(scenario, period, category) %>%
@@ -174,20 +197,13 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   
-  
-  dfShock <- data2 %>% 
-    select(-starts_with("share|")) %>%
+  dfShock <- consBase %>%
     merge( data1 %>% filter(category != 'Transfer'), by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(shock = consumptionCa * decilWelfChange / 100 ) %>%
+    mutate(shock = consumptionCa * (exp(decilWelfChange/100)-1) ) %>%
     select( -consumptionCa, -decilWelfChange ) 
-  
-  dfBase <- data2 %>% 
-    select(-starts_with("share|")) 
-  
-  
-  
+
   df <- dfShock %>%
-    left_join(dfBase, by = c("scenario", "region", "period", "decileGroup"))
+    left_join(consBase, by = c("scenario", "region", "period", "decileGroup"))
   
   
   # Step 2: Shapley with zero-income exclusion
@@ -301,10 +317,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
 
     
-  result[['theilTDecomp']] <- data2 %>%
-    select(-starts_with("share|")) %>%
+  result[['theilTDecomp']] <- consBase %>%
     merge(welfByDecile, by = c("scenario", "region", "period", "decileGroup")) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange / 100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c("scenario", "region", "period")) %>%
     mutate(population = population / 10) %>%
     group_by(scenario, period) %>%
@@ -325,10 +340,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       df <- cbind(df, theil_result, theil_result_base)
     })
   
-  result[['theilLDecomp']] <- data2 %>%
-    select(-starts_with("share|")) %>%
+  result[['theilLDecomp']] <- consBase %>%
     merge(welfByDecile, by = c("scenario", "region", "period", "decileGroup")) %>%
-    mutate(consumptionCaPost = consumptionCa * (1 + welfChange / 100)) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c("scenario", "region", "period")) %>%
     mutate(population = population / 10) %>%
     group_by(scenario, period) %>%

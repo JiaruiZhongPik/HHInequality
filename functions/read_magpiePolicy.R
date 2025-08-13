@@ -8,7 +8,7 @@ read_magpiePolicy <- function(magpierun, magpiepath, magpie_base, magpiepath_bas
   priceRun <- read_magpiePrice(magpiepath) 
   priceBase <-  read_magpiePrice(magpiepath_base) 
   
-  relaPrice <- priceRun / priceBase - 1 
+  relaPrice <- priceRun / priceBase 
   
   #compute the price change
   dfRun <- as.data.frame(relaPrice) %>%
@@ -27,9 +27,9 @@ read_magpiePolicy <- function(magpierun, magpiepath, magpie_base, magpiepath_bas
       sector == "processed" ~ "Empty calories",
       TRUE ~ sector),
       scenario = magpierun,
-            variable = paste0('deltPrice|',sector),
+            variable = paste0('relaPrice|',sector),
       baseline = magpie_base,
-      unit = '%')
+      unit = '')
   
   #get the absolute price
   dfRun <-  priceRun %>% 

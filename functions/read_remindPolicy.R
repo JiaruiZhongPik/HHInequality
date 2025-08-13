@@ -36,9 +36,9 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     mutate( scenario = case_when(scenario == scen_base ~ "base",
                            scenario == scen_policy ~ "policy")) %>%
     pivot_wider(names_from = scenario, values_from = value) %>% 
-    mutate(deltPrice = policy/base - 1 ) %>%
+    mutate(deltPrice = policy/base ) %>%
     select(-policy, -base) %>%
-    mutate(variable = "deltPrice|Other commodities",
+    mutate(variable = "relaPrice|Other commodities",
            baseline = scen_base,
            scenario = scen_policy) %>%
     rename( value = deltPrice ) %>%
@@ -127,9 +127,9 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
       scenario = case_when(scenario == scen_base ~ "base",
                            scenario == scen_policy ~ "policy"))%>%
     spread(scenario,value)%>%
-    mutate(priceRel = policy/base-1)%>%
+    mutate(priceRel = policy/base)%>%
     select(-policy,-base)%>%
-    mutate(variable = paste0('delt',variable),
+    mutate(variable = paste0('rela',variable),
            scenario = scen_policy,
            baseline = scen_base)%>%
     rename(value = priceRel)
@@ -190,10 +190,11 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
                            "Price|Transport|FE",
                            "Price|Buildings|Other fuels","Price|Buildings|Electricity","Price|Buildings|Gases",
                            "Price|Other commodities",
-                           "deltPrice|Transport|FE",
-                           "deltPrice|Buildings|Electricity","deltPrice|Buildings|Gases",
-                           "deltPrice|Buildings|Other fuels",
-                           "deltPrice|Other commodities",
+                           "relaPrice|Transport|FE",
+                           "relaPrice|Buildings|Electricity",
+                           "relaPrice|Buildings|Gases",
+                           "relaPrice|Buildings|Other fuels",
+                           "relaPrice|Other commodities",
                            'Taxes|EmiC02FFI',
                            'Taxes|EmiCH4Energy',
                            'Taxes|EmiN2OEnergy',

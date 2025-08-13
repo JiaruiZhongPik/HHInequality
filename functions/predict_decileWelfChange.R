@@ -4,7 +4,8 @@
 
 #-------------1. First-order welfare effect-------------------------
 
-predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micro_model = 'FOwelfare', fixed_point = 'midpoint'){
+predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, 
+                                     micro_model = 'FOwelfare', fixed_point = 'midpoint'){
   
   #get sectors for later use
   sectors <- data2 %>%
@@ -51,18 +52,18 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
     
   } else if ( length(sectors) == 9 ){
     
-    deltPrice <- data1 %>%
+    relaPrice <- data1 %>%
       select(-unit,-baseline)%>%
       filter(
-        str_starts(variable, "deltPrice"),
+        str_starts(variable, "relaPrice"),
         str_detect(scenario, str_c(all_budgets, collapse = "|"))
       ) %>%
       mutate(      
         variable = case_when(
-        variable ==  "deltPrice|Transport|FE" ~ "deltPrice|Transport energy",
-        variable ==  "deltPrice|Buildings|Electricity" ~ "deltPrice|Building electricity" ,
-        variable == "deltPrice|Buildings|Other fuels" ~ "deltPrice|Building other fuels",
-        variable == "deltPrice|Buildings|Gases" ~ "deltPrice|Building gases",
+        variable ==  "relaPrice|Transport|FE" ~ "relaPrice|Transport energy",
+        variable ==  "relaPrice|Buildings|Electricity" ~ "relaPrice|Building electricity" ,
+        variable == "relaPrice|Buildings|Other fuels" ~ "relaPrice|Building other fuels",
+        variable == "relaPrice|Buildings|Gases" ~ "relaPrice|Building gases",
         TRUE ~ variable  # keep unchanged otherwise
       )) %>%
       #Note: there are INF for minor cases, when the base year price is zero. For
@@ -77,7 +78,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
       ungroup() %>%
       separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
       select( -variable ) %>%
-      rename( deltPrice = value )
+      rename( relaPrice = value )
 
 
   }
@@ -97,12 +98,11 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
                       values_to = 'share') %>%
         separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
         select(-variable ) %>%
-        left_join(deltPrice %>% select(-model), by = c('scenario','region','period','category')) %>%
-        group_by(scenario, region, period, decileGroup, category) %>%
-        summarise(
-          decilWelfChange = -  sum(deltPrice * share) * 100,
-          .groups = "drop"
-        ) 
+        left_join(relaPrice %>% select(-model), by = c('scenario','region','period','category')) %>%
+        mutate(decilWelfChange = - log(relaPrice) * share *100) %>%
+        select(scenario, region, period, decileGroup, category, decilWelfChange)
+
+      
       
     }else if (fixed_point == 'base'){
       
@@ -133,12 +133,11 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
                       values_to = 'share') %>%
         separate( col= variable,into = c("variable", "category"), sep = "\\|") %>%
         select(-variable ) %>%
-        left_join(deltPrice, by = c('scenario','region','period','category')) %>%
-        group_by(scenario, region, period, decileGroup,category) %>%
-        summarise(
-          decilWelfChange = -  sum(deltPrice * share) * 100,
-          .groups = "drop"
-        ) 
+        left_join(relaPrice, by = c('scenario','region','period','category')) %>%
+        mutate(decilWelfChange = - log(relaPrice) * share *100) %>%
+        select(scenario, region, period, decileGroup, category, decilWelfChange)
+
+      
       
     } else if (fixed_point == 'midpoint') {
       
@@ -192,12 +191,9 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
                       values_to = 'share')%>%
         separate( col= variable,into = c("variable", "category"), sep = "\\|"  )%>%
         select(-variable ) %>%
-        left_join(deltPrice, by = c('scenario','region','period','category')) %>%
-        group_by(scenario, region, period, decileGroup, category)%>%
-        summarise(
-          decilWelfChange = -  sum(deltPrice * share) * 100,
-          .groups = "drop"
-        ) 
+        left_join(relaPrice, by = c('scenario','region','period','category')) %>%
+        mutate(decilWelfChange = - log(relaPrice) * share *100) %>%
+        select(scenario, region, period, decileGroup, category, decilWelfChange)
       
     }
 
@@ -211,8 +207,8 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
   decileWelfChange <-   decileConsShare %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>%
     pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
-    mutate(`C_SSP2-PkBudg650` = (`C_SSP2-PkBudg650` /  `C_SSP2-NPi2025` - 1) * 100,
-           `C_SSP2-PkBudg1000` = (`C_SSP2-PkBudg1000` /  `C_SSP2-NPi2025` - 1) * 100  ) %>%
+    mutate(`C_SSP2-PkBudg650` = log(`C_SSP2-PkBudg650` /  `C_SSP2-NPi2025`) * 100,
+           `C_SSP2-PkBudg1000` = log(`C_SSP2-PkBudg1000` /  `C_SSP2-NPi2025`) * 100 ) %>%
     select( -`C_SSP2-NPi2025` ) %>%
     mutate(category = 'Consumption') %>%
     pivot_longer(cols = starts_with('C_SSP2'), names_to = 'scenario', values_to = 'decilWelfChange') %>%
@@ -240,7 +236,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, micr
            region != 'World') %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>%
     left_join(transferCa,by = c('scenario', 'region', 'period')) %>%
-    mutate(decilWelfChange = transferCa / consumptionCa *100,
+    mutate(decilWelfChange = log(1+transferCa / consumptionCa) *100,
            category = 'Transfer') %>%
     select(-consumptionCa, -transferCa) %>%
     bind_rows(decileWelfChange)
