@@ -18,6 +18,7 @@ source('functions/predict_decileConsShare.R')
 source('functions/plot_inspection.R')
 source('functions/predict_decileWelfChange.R')
 source('functions/plot_output.R')
+source('functions/plot_outputNCC.R')
 source('functions/aggregate_decileWelfChange.R')
 source('functions/compute_inequalityMetrics.R')
 
@@ -158,14 +159,14 @@ plot_output(outputPath = outputPath,
             micro_model = micro_model, fixed_point = fixed_point, allExport = T)
 
 #any individual plot
-plot_output(outputPath = outputPath, 
+p <- plot_output(outputPath = outputPath, 
             plotdataWelf  = decileWelfChange, 
             data2 = decileConsShare, 
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = 'welfByDecileSecReg',
-            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
+            plotlist = c('welfByPeriod','ineqWorld'),
+            micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){

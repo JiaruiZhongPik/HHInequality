@@ -1643,6 +1643,8 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     }
   }
   
+  
+  return(p)
 
 
 }
