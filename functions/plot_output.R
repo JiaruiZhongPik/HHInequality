@@ -51,30 +51,32 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",
+                     "C_SSP2-PkBudg650"  = "#264f78"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+          ) +
         
         # One-by-one geom_line for each scenario
         geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", linewidth = 0.7) +
-        
         geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", linewidth = 0.7)+
         
         #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67", 
+                     "C_SSP2-PkBudg650"  = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C")) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period)) +
         
         # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Year", y = "Real Consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
@@ -1044,11 +1046,24 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
                     aes(x = period, y = value, linetype = state, color = measure)) +
         geom_line() + 
         scale_fill_brewer(palette = "Set2") +
-        facet_wrap(~scenario, ncol = 2) +
+        facet_wrap(~scenario, ncol = 2,
+                   labeller = as_labeller(
+                     c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                   )
+                   ) +
         # Labels and styling
-        labs(x = "Decile", y = "Inequality metrics", fill = "FE category") +
+        labs(x = "Year", y = "Inequality metrics", fill = "FE category") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
-        scale_color_brewer(palette = "Set2") +
+        scale_color_brewer(palette = "Set2",
+                           name = 'Metric') +
+        scale_linetype_manual(
+          name   = "Scenario",            
+          values = c("before" = "solid",       
+                     "after"  = "dashed"),   
+          labels = c("before" = "Baseline",     
+                     "after"  = "Policy")
+        )+
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
@@ -1293,54 +1308,114 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   if(any(plotlist == 'ineqTheilLRegBySecbyScen' | allExport  )){
     
     
-    for(scen in c( unique(plotdataIneq[['ineq']]$scenario))){
-      
-      
-      plotdf <- plotdataIneq[['ineq']] %>%
-        filter( period <= 2100,
-                period >= 2025,
-                scenario == scen,
-                region != 'World',
-                category != 'Total',
-                variable %in% c("ineq|deltTheilLShapley")) %>%
-        mutate(  category = factor(category, levels = allSec) )
-      
-      stack_sums <- plotdf %>%
-        group_by(period, scenario, region) %>%
-        summarise(total = sum(value, na.rm = TRUE), .groups = "drop")
-      
-      p[[paste0('ineqTheilLRegBySec_',scen)]] <- list(
-        
-        plot = ggplot(plotdf, aes(x = period, y = value, fill = category)) +
-          geom_bar(
-            stat = "identity",
-            position = position_stack(),
-            width = 2
-          ) +
-          scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
-          
-          scale_x_continuous(breaks = unique(plotdf$period),
-                             labels = unique(plotdf$period))+
-          theme_minimal() +
-          labs(
-            x = "Year",
-            y = "Inequality Change (Theil Index)",
-            fill = "Category",
-          ) +
-          coord_cartesian( ylim = quantile(stack_sums$total, probs = c(0.01, 0.99), na.rm = TRUE)) +
-          theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-          facet_wrap(~region, ncol = 3)
-        ,
-        
-        width = 10,
-        height = 8
-        
-      )
-      
-    }
+    # for(scen in c( unique(plotdataIneq[['ineq']]$scenario))){
+    #   
+    #   
+    #   plotdf <- plotdataIneq[['ineq']] %>%
+    #     filter( period <= 2100,
+    #             period >= 2025,
+    #             scenario == scen,
+    #             region != 'World',
+    #             category != 'Total',
+    #             variable %in% c("ineq|deltTheilLShapley")) %>%
+    #     mutate(  category = factor(category, levels = allSec) )
+    #   
+    #   stack_sums <- plotdf %>%
+    #     group_by(period, scenario, region) %>%
+    #     summarise(total = sum(value, na.rm = TRUE), .groups = "drop")
+    #   
+    #   p[[paste0('ineqTheilLRegBySec_',scen)]] <- list(
+    #     
+    #     plot = ggplot(plotdf, aes(x = period, y = value, fill = category)) +
+    #       geom_bar(
+    #         stat = "identity",
+    #         position = position_stack(),
+    #         width = 2
+    #       ) +
+    #       scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+    #       
+    #       scale_x_continuous(breaks = unique(plotdf$period),
+    #                          labels = unique(plotdf$period))+
+    #       theme_minimal() +
+    #       labs(
+    #         x = "Year",
+    #         y = "Inequality Change (Theil Index)",
+    #         fill = "Category",
+    #       ) +
+    #       coord_cartesian( ylim = quantile(stack_sums$total, probs = c(0.01, 0.99), na.rm = TRUE)) +
+    #       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    #       facet_wrap(~region, ncol = 3)
+    #     ,
+    #     
+    #     width = 10,
+    #     height = 8
+    #     
+    #   )
+    #   
+    # }
    
+    plotdf <- plotdataIneq[['ineq']] %>%
+      filter(period >= 2025, period <= 2100,
+             region != "World",
+             category != "Total",
+             variable == "ineq|deltTheilLShapley") %>%
+      mutate(
+        category   = factor(category, levels = allSec),
+        period_fac = factor(period),                 # keep labels
+        period_num = as.numeric(period_fac),         # base x positions
+        scen_off   = recode(scenario,                # nudge scenarios left/right
+                            "C_SSP2-PkBudg1000" = -0.22,
+                            "C_SSP2-PkBudg650"  =  0.22,
+                            .default = 0),
+        x = period_num + scen_off
+      )
     
+    totals <- plotdf %>%
+      group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
+      summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop")
     
+    p[[paste0('ineqTheilLRegBySec')]] <- list(
+    
+      plot = ggplot(plotdf, aes(x = x, y = value, fill = category)) +
+        geom_col(width = 0.40) +
+        # add the scenario markers
+        geom_point(
+          data = totals,
+          aes(x = x, y = total, shape = scenario),
+          inherit.aes = FALSE,
+          size = 1,
+          colour = "black"
+        ) +
+        scale_shape_manual(values = c(
+          "C_SSP2-PkBudg1000" = 4,   # filled circle
+          "C_SSP2-PkBudg650"  = 3    # filled triangle
+        ))+
+        facet_wrap(~ region, ncol = 3) +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+        scale_x_continuous(
+          breaks = sort(unique(plotdf$period_num)),
+          labels = levels(plotdf$period_fac)
+        ) +
+        labs(x = "Year",
+             y = "Inequality Change (Theil Index)",
+             fill = "Category",
+             shape = "Scenario") +
+        theme_minimal() +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        ) +
+        guides(fill = guide_legend(nrow = 3), 
+               shape = guide_legend(nrow = 2))
+      ,
+
+          width = 10,
+          height = 8
+    
+      )
+
+
     
   }
   
@@ -1453,11 +1528,16 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           aes(color = component),
           size = 1.2
         ) +
-        facet_wrap(~scenario) +
+        facet_wrap(~scenario, ncol = 2,
+                   labeller = as_labeller(
+                     c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                   )
+        ) +
         labs(
           x = "Year",
-          y = "Change in Inequality (Theil)",
-          title = "Theil Inequality Decomposition over Time by Scenario",
+          y = "Change in Theil",
+          #title = "Theil Inequality Decomposition over Time by Scenario",
           fill = "Component",
           color = "Theil"
         ) +
@@ -1526,7 +1606,12 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             size = 1,
             linetype = 2
           ) +
-          facet_wrap(~scenario) +
+          facet_wrap(~scenario, ncol = 2,
+                     labeller = as_labeller(
+                       c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                     )
+          ) +
           labs(
             x = "Year",
             y = "Change in Inequality (Theil)",
@@ -1587,11 +1672,15 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             size = 1,
             linetype = 2
           ) +
-          facet_wrap(~scenario) +
+          facet_wrap(~scenario, ncol = 2,
+                     labeller = as_labeller(
+                       c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                     )) +
           labs(
             x = "Year",
-            y = "Change in Inequality (Theil)",
-            title = "Theil Inequality Decomposition over Time by Scenario",
+            y = "Change in Theil",
+            #title = "Theil Inequality Decomposition over Time by Scenario",
             fill = "Component",
             color = "Theil"
           ) +

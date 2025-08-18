@@ -1,7 +1,8 @@
 
 
 plot_outputNCC <- function(){
-  theme_set(theme_minimal(base_family = "Arial", base_size = 7))
+
+    theme_set(theme_minimal(base_family = "Arial", base_size = 7))
   
   nature_dims <- function(type = c("research_1col","research_2col"),
                           caption_words = 150) {
@@ -46,6 +47,9 @@ plot_outputNCC <- function(){
                                             tag_levels = "a", tag_prefix = "", tag_suffix = "",
                                             tag_fontfamily = "Arial", tag_face = "bold", tag_size = 7,
                                             panel_spacing_mm = 2, bg = "white",
+                                            tag_x=0.05, tag_y = 1,
+                                            tag_margin_r = 4,
+                                            axis_title_y_margin_r = 6,
                                             word_format = c("svg","emf","png"), png_dpi = 300,
                                             collect_guides = TRUE, legend_position = "bottom", legend_direction = "horizontal") {
     
@@ -60,13 +64,23 @@ plot_outputNCC <- function(){
     if (!is.null(rel_widths))  wrap <- wrap + plot_layout(widths  = rel_widths)
     if (!is.null(rel_heights)) wrap <- wrap + plot_layout(heights = rel_heights)
     wrap <- wrap + plot_layout(guides = if (collect_guides) "collect" else "keep") &
-      theme(plot.margin = unit(rep(panel_spacing_mm, 4), "mm")) &
+      theme(plot.margin = margin(t = 3.5, r = 2, b = 2, l = 2, unit = "mm")) &
       theme(legend.position = legend_position,
             legend.direction = legend_direction,
-            legend.box = if (legend_direction == "horizontal") "horizontal" else "vertical")
+            #legend.margin   = margin(t = -3, b = 0, r = 20, l = 20, unit = "mm"),  # pull legend closer up
+            legend.margin   = margin(t = -3, b = 0, r = -5, l = -5, unit = "mm"),  #
+            legend.spacing  = unit(10, "mm"),                      # reduce gaps between items
+            legend.box = if (legend_direction == "horizontal") "horizontal" else "vertical",
+            legend.key.width  = unit(5, "mm"),   # make keys wider/narrower
+            legend.key.height = unit(4, "mm"))     # and their height
     wrap <- wrap + plot_annotation(tag_levels = tag_levels, tag_prefix = tag_prefix, tag_suffix = tag_suffix) &
-      theme(plot.tag.position = c(0,1),
-            plot.tag = element_text(family = tag_fontfamily, face = tag_face, size = tag_size, hjust = 0, vjust = 1))
+      theme(
+        plot.tag.position = c(tag_x, tag_y),                    # move "a"/"b"
+        plot.tag = element_text(
+          family = tag_fontfamily, face = tag_face, size = tag_size,
+          hjust = 0, vjust = 1, margin = margin(r = tag_margin_r) # small gap to axis
+        )
+      ) 
     
     # 1) PDF
     nature_save_pdf(
@@ -138,6 +152,10 @@ plot_outputNCC <- function(){
                                       type = c("research_1col","research_2col","review_1col","review_2col","review_3col"),
                                       caption_words = 150, ncol = 2, custom_height_mm = NULL,
                                       tag_levels = "a", panel_spacing_mm = 2,
+                                      tag_x = 0.05, tag_y = 1,
+                                      tag_margin_r = 4,
+                                      tag_size = 9,
+                                      axis_title_y_margin_r = 6,
                                       word_format = c("svg","emf","png"), png_dpi = 300,
                                       collect_guides = TRUE, legend_position = "bottom", legend_direction = "horizontal") {
     
@@ -158,6 +176,10 @@ plot_outputNCC <- function(){
       rel_widths = rel_w,
       custom_height_mm = custom_height_mm,
       tag_levels = tag_levels,
+      tag_x = tag_x, tag_y = tag_y,
+      tag_margin_r = tag_margin_r,
+      tag_size = tag_size,
+      axis_title_y_margin_r = tag_margin_r,
       panel_spacing_mm = panel_spacing_mm,
       word_format = word_format,
       png_dpi = png_dpi,
@@ -200,7 +222,7 @@ plot_outputNCC <- function(){
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
                          plotlist = c('ineqTheilLRegBySecbyScen'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   
   
@@ -213,44 +235,49 @@ plot_outputNCC <- function(){
                          plotlist = c('ineqWorldWithTransf'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
   
-  
+  dir <- paste0(outputPath,'/ncc')
   
   nature_export_from_list(
     figure1,
-    dir = "figure/ncc",
+    dir =   dir,
     stem = "Figure1",
     type = "research_2col",
     caption_words = 120,
     ncol =1,
+    collect_guides = F,
     custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1.1
   )
   
   nature_export_from_list(
     figure2,
-    dir = "figure/ncc",
+    dir =   dir,
     stem = "Figure2",
     type = "research_2col",
     caption_words = 120,
     ncol = 1,
+    collect_guides = F,
     custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1
   )
   
   nature_export_from_list(
     figure3,
-    dir = "figure/ncc",
+    dir =   dir,
     stem = "Figure3",
     type = "research_2col",
     caption_words = 120,
-    ncol = 2,
+    ncol = 1,
+    collect_guides = F,
     custom_height_mm = 160,
     word_format = "png"     # or "emf"/"png"
   )
   
   nature_export_from_list(
     figure4,
-    dir = "figure/ncc",
+    dir =   dir,
     stem = "Figure4",
     type = "research_2col",
     caption_words = 120,
