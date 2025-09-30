@@ -1,11 +1,11 @@
 #----This function conducts regression with Eurostat consumption data----------
 
 
-analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gcd', regionmapping = 'H12',
+analyze_regression <- function (regression_model = 'PolynomialLM', consData ='gcd', regionGrouping = 'H12',
                                 isDisplay = TRUE, isExport = FALSE) {
   
   # Read in regional mapping   
-  if(regionmapping =='H12') {
+  if(regionGrouping =='H12') {
     
     regionMapping<- read_delim("input/regionmappingH12.csv", 
                                delim = ";", escape_double = FALSE, col_types = cols(X = col_skip()), 
@@ -13,7 +13,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
                                show_col_types = FALSE) %>%
       rename(geo = CountryCode,
              region = RegionCode) 
-  } else if (regionmapping == 'H21') {
+  } else if (regionGrouping == 'H21') {
     
     regionMapping <- read_delim("input/regionmapping_21_EU11.csv", 
                                     delim = ";", escape_double = FALSE, col_types = cols(X = col_skip(), 
@@ -26,7 +26,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
   
 
   
-  if (ConsData == 'eurostat'){
+  if (consData == 'eurostat'){
     
     hhConsData = prepare_eurostatData()
     
@@ -80,7 +80,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
                 digits = 3,
                 keep = c('Constant','exp'))
     }
-  } else if (ConsData == 'gcd'){
+  } else if (consData == 'gcd'){
     
     dfRaw = prepare_gcdData(isDisplay,isExport)
     
@@ -99,10 +99,10 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
       left_join(pop, by=c('geo', 'year'))
     
     
-    if (regionmapping == 'country'){
+    if (regionGrouping == 'country'){
       hhConsData <- hhConsData %>%f
         mutate(region = geo)
-    } else if (regionmapping =='pool'){
+    } else if (regionGrouping =='pool'){
       hhConsData <- hhConsData %>%
         mutate(region = 'pool')
     } else {
@@ -208,7 +208,7 @@ analyze_regression <- function (regression_model = 'PolynomialLM', ConsData ='gc
     
     # Print warning if any are missing
     
-    if (regionmapping %in% c('H12','H21')){
+    if (regionGrouping %in% c('H12','H21')){
       
       missing_countries <- setdiff(unique(regionMapping$region), unique(coef$region))
       

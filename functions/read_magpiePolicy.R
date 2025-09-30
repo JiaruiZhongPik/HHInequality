@@ -111,7 +111,7 @@ dfRun <-    taxrev_magpie %>%
   mutate( value = value / 1e3,
           sector = 'total',
           scenario = magpierun,
-          variable = 'Taxes|GHGenergy|MAGPIE',
+          variable = 'Taxes|GHG|MAGPIE',
           baseline = 'NA',
           unit = 'billion $ MER') %>%
   bind_rows(dfRun) %>% 

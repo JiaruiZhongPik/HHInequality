@@ -2,8 +2,10 @@
 
 predict_decileConsShare <- function(data, coef, gini_baseline, regression_model = 'logitTransOLS', missingMapping = NA, countryExample = NA, 
                                     isDisplay = FALSE, isExport = FALSE){
-  #TODO: Future food expenditure needs to be added
-  
+  if(isExport == T){
+    dir.create(paste0(outputPath), recursive = TRUE, showWarnings = FALSE)
+  }
+ 
   #Compute regional annual expenditure share
   data1<-
     data %>%
@@ -521,6 +523,7 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
     } 
     
     if(isExport){
+     
       ggsave(paste0(outputPath,"/FE share projection_",regression_model,'.tiff'), combined_plot, width = 12, height =5, units = "in", dpi = 300)
     }
 

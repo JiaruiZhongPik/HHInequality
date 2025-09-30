@@ -2,7 +2,7 @@
 
 plot_outputNCC <- function(){
 
-    theme_set(theme_minimal(base_family = "Arial", base_size = 7))
+  theme_set(theme_minimal(base_family = "Arial", base_size = 7))
   
   nature_dims <- function(type = c("research_1col","research_2col"),
                           caption_words = 150) {
@@ -64,11 +64,11 @@ plot_outputNCC <- function(){
     if (!is.null(rel_widths))  wrap <- wrap + plot_layout(widths  = rel_widths)
     if (!is.null(rel_heights)) wrap <- wrap + plot_layout(heights = rel_heights)
     wrap <- wrap + plot_layout(guides = if (collect_guides) "collect" else "keep") &
-      theme(plot.margin = margin(t = 3.5, r = 2, b = 2, l = 2, unit = "mm")) &
+      theme(plot.margin = margin(t = 3.5, r = 2, b = 1, l = 2, unit = "mm")) &
       theme(legend.position = legend_position,
             legend.direction = legend_direction,
             #legend.margin   = margin(t = -3, b = 0, r = 20, l = 20, unit = "mm"),  # pull legend closer up
-            legend.margin   = margin(t = -3, b = 0, r = -5, l = -5, unit = "mm"),  #
+            legend.margin   = margin(t = -3, b = 0, r = 0, l = -5, unit = "mm"),  #
             legend.spacing  = unit(10, "mm"),                      # reduce gaps between items
             legend.box = if (legend_direction == "horizontal") "horizontal" else "vertical",
             legend.key.width  = unit(5, "mm"),   # make keys wider/narrower
@@ -224,15 +224,22 @@ plot_outputNCC <- function(){
                          plotlist = c('ineqTheilLRegBySecbyScen'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
-  
-  
   figure4 <- plot_output(outputPath = outputPath, 
                          plotdataWelf  = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
-                         plotlist = c('ineqWorldWithTransf'),
+                         plotlist = c('theilSectorDriver'),
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
+  
+  figure5 <- plot_output(outputPath = outputPath, 
+                         plotdataWelf  = decileWelfChange, 
+                         data2 = decileConsShare, 
+                         data3 = data, 
+                         plotdataIneq = ineq,
+                         exampleReg = 'IND',
+                         plotlist = c('taxRevenueWorld','ineqWorldWithTransf'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
   
   dir <- paste0(outputPath,'/ncc')
@@ -245,7 +252,7 @@ plot_outputNCC <- function(){
     caption_words = 120,
     ncol =1,
     collect_guides = F,
-    custom_height_mm = 160,
+    custom_height_mm = 120,
     word_format = "png",
     tag_x = 0.05,tag_y = 1.1
   )
@@ -255,10 +262,10 @@ plot_outputNCC <- function(){
     dir =   dir,
     stem = "Figure2",
     type = "research_2col",
-    caption_words = 120,
+    caption_words = 140,
     ncol = 1,
     collect_guides = F,
-    custom_height_mm = 160,
+    custom_height_mm = 120,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
   )
@@ -282,7 +289,20 @@ plot_outputNCC <- function(){
     type = "research_2col",
     caption_words = 120,
     ncol = 1,
-    custom_height_mm = 80,
+    collect_guides = F,
+    custom_height_mm = 160,
+    word_format = "png"     # or "emf"/"png"
+  )
+  
+  nature_export_from_list(
+    figure5,
+    dir =   dir,
+    stem = "Figure5",
+    type = "research_2col",
+    caption_words = 120,
+    ncol = 1,
+    collect_guides = F,
+    custom_height_mm = 120,
     word_format = "png"     # or "emf"/"png"
   )
   

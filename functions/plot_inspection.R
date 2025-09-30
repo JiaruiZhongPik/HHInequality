@@ -17,7 +17,7 @@ plot_inspection <- function( outputPath,
     
     
       plotdf <- dataPrice %>% 
-        filter (grepl("^deltPrice", variable)) %>%
+        filter (grepl("^relaPrice", variable)) %>%
         mutate(variable = str_remove(variable, "^deltPrice\\|"))
       
       for(scen in unique(plotdf$scenario)){
@@ -26,13 +26,13 @@ plot_inspection <- function( outputPath,
           filter( scenario == scen )
         
         p[[paste0('shock', scen)]] <- list(
-          plot = ggplot(plotdf1, aes(x = period, y = value, color = variable)) +
+          plot = ggplot(plotdf1, aes(x = period, y = (value-1)*100, color = variable)) +
             geom_line(linewidth = 1) +
             facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot
             scale_color_paletteer_d("ggthemes::Classic_10") +
             labs(
               x = "Year",
-              y = "Value",
+              y = "% change of price",
               color = "Variable",
               linetype = "Scenario"
             ) +
@@ -184,11 +184,12 @@ plot_inspection <- function( outputPath,
       for(scen in unique(plotdf$scenario)){
         
         plotdf1 <- plotdf %>%
-          filter( scenario == scen )
+          filter( scenario == scen,
+                  region != 'World')
         
-        p[[paste0('shock', scen)]] <- list(
+        p[[paste0('revenue', scen)]] <- list(
           plot = ggplot(plotdf1 %>% filter(variable %in% c("GHGenergy|REMIND","GHGenergy|MAGPIE")), 
-                        aes(x = period, y = value, color = variable, linetype = variable)) +
+                        aes(x = period, y = value, color = variable)) +
             geom_line(linewidth = 1) +
             facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot
             scale_color_paletteer_d("ggthemes::Classic_10") +

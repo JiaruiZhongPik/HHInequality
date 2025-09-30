@@ -2,9 +2,9 @@
 # with internal estimates
 # Jiarui Zhong
 
-get_estimateMcc <- function(regions = 'H12'){
+get_estimateMcc <- function(regionGrouping = 'H12'){
  
-   if(regions == 'H12'){
+   if(regionGrouping == 'H12'){
     
      region <- read_delim("input/regionmappingH12.csv", 
                          delim = ";", escape_double = FALSE, col_types = cols(X = col_skip()), 
@@ -42,7 +42,7 @@ get_estimateMcc <- function(regions = 'H12'){
      print('JPN data missing and CHN estimate invalid, they are 
            replaced with GCD global estiamtes')
      
-     coef_gcd <- analyze_regression(regression_model = regression_model, ConsData = ConsData, regionmapping = 'pool',
+     coef_gcd <- analyze_regression(regression_model = regression_model, ConsData = ConsData, regionGrouping = 'pool',
                                     isDisplay = TRUE, isExport = T) %>%
        mutate(label = 'gcd')
       
@@ -52,7 +52,8 @@ get_estimateMcc <- function(regions = 'H12'){
        bind_rows(coef_mcc %>% filter(region != 'CHA') )
      
     
-    }else if(regions == 'H21') {
+    }else if(regionGrouping == 'H21') {
+    
     region <- 
      read_delim("input/regionmapping_21_EU11.csv", 
                 delim = ";", escape_double = FALSE, col_types = cols(X = col_skip(), 
@@ -63,7 +64,33 @@ get_estimateMcc <- function(regions = 'H12'){
       distinct() %>%
       pull(RegionCode)
     
-    print('input not available yet')
+    print('input not available yet and using regional-specific Engel curve is abandoned as being unrealiable for future projection')
+    
+    } else if(regionGrouping == 'pool'){
+    
+
+      coef <- read_excel("input/Engel_Curve_Joint_Estimation_Alternative.xlsx") %>%
+        rename(value = estimate,
+               regressor = term,
+               sector = Type) %>%
+        select(sector, regressor, value) %>%
+        mutate(
+          regressor = str_replace_all(regressor,c(
+            "log_hh_expenditures_USD_2017_square" = "I(log(exp)^2)",
+            "log_hh_expenditures_USD_2017" = "log(exp)"
+          )),
+          sector = str_replace_all(sector,c(
+            'Electricity' = 'Building electricity',
+            'Other fuels' = 'Building other fuels',
+            'Gas' = 'Building gases',
+            'Fruits & Vegetables' = 'Fruits vegetables nuts',
+            'Staple food' = 'Staples',
+            'Other food' = 'Empty calories',
+            'Goods' = 'Other commodities'
+          ))) %>%
+        mutate(region = 'pool')
+      
+      
   }
 
   

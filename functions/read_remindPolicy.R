@@ -163,14 +163,14 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     # taxes from non-LU CH4 (in Mt CH4) and N2O (in kt N2O) emissions
     "`Taxes|EmiCH4Energy`" = "(`Emi|CH4|+|Energy Supply` + `Emi|CH4|+|Extraction`)*1e6 * 28 * `Price|Carbon`/1e9",
     "`Taxes|EmiN2OEnergy`" = "(`Emi|N2O|+|Energy Supply` + `Emi|N2O|+|Industry` + `Emi|N2O|+|Transport`) *1e3 * 265 * `Price|Carbon`/1e9",
-    "`Taxes|GHGenergy|REMIND`" = "`Taxes|EmiC02FFI` + `Taxes|EmiCH4Energy` + `Taxes|EmiN2OEnergy`",
+    "`Taxes|GHG|REMIND`" = "`Taxes|EmiC02FFI` + `Taxes|EmiCH4Energy` + `Taxes|EmiN2OEnergy`",
     # LUC revenues are not used for redistribution, so don't need these
     # "`Taxes|EmiCO2LUC`" = "`Emi|CO2|Land-Use Change`*1e6 * `Price|Carbon`/ 1e9",
     # "`Taxes|EmiCO2LUC|Rel`" = "`Taxes|EmiCO2LUC`/`GDP|MER|Base`",
     units = c(
       "billion US$2017/yr","billion US$2017/yr","billion US$2017/yr","billion US$2017/yr"
     ))  %>%
-    filter(variable %in% c('Taxes|EmiC02FFI','Taxes|EmiCH4Energy','Taxes|EmiN2OEnergy','Taxes|GHGenergy|REMIND'))%>%
+    filter(variable %in% c('Taxes|EmiC02FFI','Taxes|EmiCH4Energy','Taxes|EmiN2OEnergy','Taxes|GHG|REMIND'))%>%
     mutate(value = pmax(value, 0)) # remove negative revenues
     
 
@@ -198,7 +198,7 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
                            'Taxes|EmiC02FFI',
                            'Taxes|EmiCH4Energy',
                            'Taxes|EmiN2OEnergy',
-                           'Taxes|GHGenergy|REMIND'
+                           'Taxes|GHG|REMIND'
                            ),
            scenario == scen_policy
     ) %>% 

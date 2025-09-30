@@ -2,14 +2,18 @@
 
 
 
-plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
+plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
   
-  plotdataWelfWithTransf <- plotdataWelf %>%
-    filter( period %notin% c(2015,2010,2020,2025))
+  plotdataWelfWithTransfEpc <- data1 %>%
+    filter(category != 'TransferNeut') %>%
+    filter( period %notin% c(2010,2110,2130,2150))
   
-  plotdataWelf <- plotdataWelf %>%
-    filter(category != 'Transfer') %>%
-    filter( period %notin% c(2015,2010,2020,2025))
+  plotdataWelf <- data1 %>%
+    filter(category != 'TransferEpc') %>%
+    filter( period %notin% c(2010,2110,2130,2150))
+  
+  data3 <- data3 %>%
+    filter(period %notin% c(2010,2110,2130,2150))
 
   
   numSector <- length(unique(plotdataWelf$category))
@@ -24,7 +28,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     #todo: is using weighted average better?
     
     dataDecile <- plotdataWelf %>%
-      filter(period <= 2100) %>%
+      filter(period <= 2100 ) %>%
       group_by(scenario, period, region, decileGroup) %>%
       summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
 
@@ -76,13 +80,17 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
                            labels = unique(plotdataWelf$period)) +
         
         # Labels and styling
-        labs(x = "Year", y = "Real Consumpition Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Year", y = "Consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
-          legend.direction = "horizontal"
+          legend.direction = "horizontal",
+          panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
         ),
       
       width = 5,
@@ -1055,8 +1063,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         # Labels and styling
         labs(x = "Year", y = "Inequality metrics", fill = "FE category") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
-        scale_color_brewer(palette = "Set2",
-                           name = 'Metric') +
+        scale_color_paletteer_d("dutchmasters::pearl_earring") +
         scale_linetype_manual(
           name   = "Scenario",            
           values = c("before" = "solid",       
@@ -1064,11 +1071,17 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           labels = c("before" = "Baseline",     
                      "after"  = "Policy")
         )+
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
-          legend.direction = "horizontal"
+          legend.direction = "horizontal",
+          panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
         ),
       
       width = 8,
@@ -1097,16 +1110,46 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
                     aes(x = period, y = value, color = variable, linetype = category)) +
         geom_line() + 
         scale_fill_brewer(palette = "Set2") +
-        facet_wrap(~scenario, ncol = 2) +
+        facet_wrap(~scenario, ncol = 2,
+                   labeller = as_labeller(
+                     c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C"))
+                   ) +
         # Labels and styling
-        labs(x = "Decile", y = "Inequality metrics", fill = "FE category") +
+        labs(x = "Year", y = "Change in inequality metrics", fill = "FE category") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
-        scale_color_brewer(palette = "Set2") +
+        scale_color_paletteer_d("dutchmasters::pearl_earring",
+                                name = "Metric",
+                                labels = c(
+                                  "ineq|deltGini" = 'Gini',
+                                  "ineq|deltTheilL" = "TheilL",
+                                  "ineq|deltTheilT" = "TheilT"
+                                )) +
+        scale_linetype_manual(name = "Compensation",
+                              values = c("Total" = "solid", 
+                                         "TotalWithTransf" = "dashed"),
+                              labels = c("Total" = "No transfer",
+                                         "TotalWithTransf" = "Lump sum")) +
+        scale_x_continuous(breaks = unique(plotdataWelf$period),
+                           labels = unique(plotdataWelf$period)) +
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
-          legend.direction = "horizontal"
+          legend.direction = "horizontal",
+          panel.grid.major.y = element_line(
+            color = "grey70",     # light grey
+            linewidth = 0.1,      # thinner line
+            linetype = "dashed"   # dashed style
+          ),
+          panel.grid.major.x = element_line(
+            color = "grey70",     # light grey
+            linewidth = 0.1,      # thinner line
+            linetype = "dashed"   # dashed style
+          ),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
         ),
       
       width = 8,
@@ -1165,7 +1208,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         labs(x = "Decile", y = "Inequality metrics", 
              color = "Measure", linetype = "Scenario-State") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
-        scale_color_brewer(palette = "Set2") +
+        scale_color_paletteer_d("dutchmasters::pearl_earring") +
         scale_linetype_manual(
           values = c(
             "C_SSP2-PkBudg1000.before" = "solid",
@@ -1244,7 +1287,11 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           fill = "Category",
           shape = "Scenario",
         ) +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1),
+              panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+              panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+              panel.grid.minor = element_blank(),
+              panel.background = element_rect(fill = "white", color = NA)) +
         facet_wrap(~scenario, ncol = 2)
       ,
       
@@ -1261,7 +1308,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     
     plotdf <- plotdataIneq[['ineq']] %>%
       filter( period <= 2100,
-              period >= 2025,
+              period >= 2015,
               region == exampleReg,
               category != 'Total',
               variable %in% c("ineq|deltTheilLShapley")) %>%
@@ -1357,7 +1404,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
     plotdf <- plotdataIneq[['ineq']] %>%
       filter(period >= 2025, period <= 2100,
              region != "World",
-             category != "Total",
+             category %notin% c("Total", "Consumption"),
              variable == "ineq|deltTheilLShapley") %>%
       mutate(
         category   = factor(category, levels = allSec),
@@ -1386,25 +1433,34 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           size = 1,
           colour = "black"
         ) +
-        scale_shape_manual(values = c(
+        scale_shape_manual(
+          name = "Scenario",
+          values = c(
           "C_SSP2-PkBudg1000" = 4,   # filled circle
           "C_SSP2-PkBudg650"  = 3    # filled triangle
-        ))+
+        ),
+        labels = c(
+          "C_SSP2-PkBudg1000" = "SSP2-2°C",
+          "C_SSP2-PkBudg650"  = "SSP2-1.5°C"
+        )
+        )+
         facet_wrap(~ region, ncol = 3) +
         scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
-        scale_x_continuous(
-          breaks = sort(unique(plotdf$period_num)),
-          labels = levels(plotdf$period_fac)
-        ) +
+        scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
+                            labels = levels(plotdf$period_fac) ) +
         labs(x = "Year",
-             y = "Inequality Change (Theil Index)",
-             fill = "Category",
+             y = "Inequality Change (TheilL)",
+             fill = "Sectors",
              shape = "Scenario") +
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
-          legend.direction = "horizontal"
+          legend.direction = "horizontal",
+          panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
         ) +
         guides(fill = guide_legend(nrow = 3), 
                shape = guide_legend(nrow = 2))
@@ -1416,6 +1472,81 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
       )
 
 
+    
+  }
+  if(any(plotlist == 'ineqTheilTRegBySecbyScen' | allExport  )){
+    
+    plotdf <- plotdataIneq[['ineq']] %>%
+      filter(period >= 2025, period <= 2100,
+             region != "World",
+             category %notin% c("Total", "Consumption"),
+             variable == "ineq|deltTheilTShapley") %>%
+      mutate(
+        category   = factor(category, levels = allSec),
+        period_fac = factor(period),                 # keep labels
+        period_num = as.numeric(period_fac),         # base x positions
+        scen_off   = recode(scenario,                # nudge scenarios left/right
+                            "C_SSP2-PkBudg1000" = -0.22,
+                            "C_SSP2-PkBudg650"  =  0.22,
+                            .default = 0),
+        x = period_num + scen_off
+      )
+    
+    totals <- plotdf %>%
+      group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
+      summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop")
+    
+    p[[paste0('ineqTheilTRegBySec')]] <- list(
+      
+      plot = ggplot(plotdf, aes(x = x, y = value, fill = category)) +
+        geom_col(width = 0.40) +
+        # add the scenario markers
+        geom_point(
+          data = totals,
+          aes(x = x, y = total, shape = scenario),
+          inherit.aes = FALSE,
+          size = 1,
+          colour = "black"
+        ) +
+        scale_shape_manual(
+          name = "Scenario",
+          values = c(
+            "C_SSP2-PkBudg1000" = 4,   # filled circle
+            "C_SSP2-PkBudg650"  = 3    # filled triangle
+          ),
+          labels = c(
+            "C_SSP2-PkBudg1000" = "SSP2-2°C",
+            "C_SSP2-PkBudg650"  = "SSP2-1.5°C"
+          )
+        )+
+        facet_wrap(~ region, ncol = 3) +
+        scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
+        scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
+                            labels = levels(plotdf$period_fac) ) +
+        labs(x = "Year",
+             y = "Inequality Change (TheilT)",
+             fill = "Sectors",
+             shape = "Scenario") +
+        theme_minimal() +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal",
+          panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
+        ) +
+        guides(fill = guide_legend(nrow = 3), 
+               shape = guide_legend(nrow = 2))
+      ,
+      
+      width = 10,
+      height = 8
+      
+    )
+    
+    
     
   }
   
@@ -1463,7 +1594,9 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         geom_line(
           data = filter(plotdf, component == "Total"),
           aes(color = component),
-          size = 1.2
+          color = "black",
+          linetype = 'dashed',
+          size = 0.8
         ) +
         facet_wrap(~scenario) +
         labs(
@@ -1475,10 +1608,25 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
+        paletteer::scale_fill_paletteer_d(name = "Region", "NatParksPalettes::Yellowstone") +
         theme_minimal() +
         theme(axis.text.x = element_text(angle = 45, hjust = 1),
-              legend.text = element_text(size = 7),      
-              legend.title = element_text(size = 8)   )
+              legend.text = element_text(size = 6),      
+              legend.title = element_text(size = 8,vjust = 0.9),
+              panel.grid.major.y = element_line(
+                color = "grey70",     # light grey
+                linewidth = 0.1,      # thinner line
+                linetype = "dashed"   # dashed style
+              ),
+              panel.grid.major.x = element_line(
+                color = "grey70",     # light grey
+                linewidth = 0.1,      # thinner line
+                linetype = "dashed"   # dashed style
+              ),
+              panel.grid.minor.x = element_blank(),
+              panel.grid.minor.y = element_blank(),
+              panel.background = element_rect(fill = "white", color = NA)
+        )
         
       ,
       
@@ -1525,8 +1673,10 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         # Line plot for Total
         geom_line(
           data = filter(plotdf, component == "Total"),
+          color = "black",
+          linetype = 'dashed',
           aes(color = component),
-          size = 1.2
+          size = 0.8
         ) +
         facet_wrap(~scenario, ncol = 2,
                    labeller = as_labeller(
@@ -1543,10 +1693,25 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
+        paletteer::scale_fill_paletteer_d(name = "Region", "NatParksPalettes::Yellowstone") +
         theme_minimal() +
         theme(axis.text.x = element_text(angle = 45, hjust = 1),
-              legend.text = element_text(size = 7),      
-              legend.title = element_text(size = 8)   )
+              legend.text = element_text(size = 6),      
+              legend.title = element_text(size = 8,vjust = 0.9),
+              panel.grid.major.y = element_line(
+                color = "grey70",     # light grey
+                linewidth = 0.1,      # thinner line
+                linetype = "dashed"   # dashed style
+              ),
+              panel.grid.major.x = element_line(
+                color = "grey70",     # light grey
+                linewidth = 0.1,      # thinner line
+                linetype = "dashed"   # dashed style
+              ),
+              panel.grid.minor.x = element_blank(),
+              panel.grid.minor.y = element_blank(),
+              panel.background = element_rect(fill = "white", color = NA)
+        )
       
       ,
       
@@ -1598,7 +1763,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             data = filter(plotdf, region != 'total'),
             aes(fill = region),
             position = "stack",
-            alpha = 0.6
+            alpha = 0.5
           ) +
           geom_line(
             data = filter(plotdf, region == "total"),
@@ -1621,7 +1786,7 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           ) +
           scale_x_continuous(breaks = unique(plotdf$period),
                              labels = unique(plotdf$period)) +
-          scale_fill_brewer(palette = "Paired") +
+          scale_fill_paletteer_d("PrettyCols::Summer")+
           scale_color_manual(values = c("Total" = "black")) +
           theme_minimal() +
           theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -1664,12 +1829,12 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
             data = filter(plotdf, region != 'total'),
             aes(fill = region),
             position = "stack",
-            alpha = 0.6
+            alpha = 0.5
           ) +
           geom_line(
             data = filter(plotdf, region == "total"),
             aes(color = "Total"),
-            size = 1,
+            size = 0.8,
             linetype = 2
           ) +
           facet_wrap(~scenario, ncol = 2,
@@ -1686,13 +1851,37 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
           ) +
           scale_x_continuous(breaks = unique(plotdf$period),
                              labels = unique(plotdf$period)) +
-          scale_fill_brewer(palette = "Paired") +
+          scale_fill_paletteer_d("PrettyCols::Summer")+
           scale_color_manual(values = c("Total" = "black")) +
+          guides(
+            fill = guide_legend( nrow = 2, byrow = TRUE,
+                                 title.position = "left",  # keep title on the side
+                                 title.hjust = 1,           # left-align text within its box
+                                 label.hjust = 0),
+            color = guide_legend( nrow = 2, byrow = TRUE,
+                                 title.position = "left",  # keep title on the side
+                                 title.hjust = 1,           # left-align text within its box
+                                 label.hjust = 0)
+          ) +
           theme_minimal() +
           theme(axis.text.x = element_text(angle = 45, hjust = 1),
-                  legend.text = element_text(size = 6),      
-                  legend.title = element_text(size = 8)      
+                legend.text = element_text(size = 6),      
+                legend.title = element_text(size = 8,vjust = 0.9),
+                panel.grid.major.y = element_line(
+                  color = "grey70",     # light grey
+                  linewidth = 0.1,      # thinner line
+                  linetype = "dashed"   # dashed style
+                ),
+                panel.grid.major.x = element_line(
+                  color = "grey70",     # light grey
+                  linewidth = 0.1,      # thinner line
+                  linetype = "dashed"   # dashed style
+                ),
+                panel.grid.minor.x = element_blank(),
+                panel.grid.minor.y = element_blank(),
+                panel.background = element_rect(fill = "white", color = NA)
                 )
+        
         
         ,
         
@@ -1709,7 +1898,170 @@ plot_output <- function(outputPath, plotdataWelf, data2, data3, plotdataIneq,  p
   #-------------End 5.4 regional inequality effect by Channel (Theil)-----------
   
   
+  
+  #---------------------------6 Global tax revenue ------------------
+  if(any(plotlist == 'taxRevenueWorld' | allExport  )){
     
+    
+    plotdf <- bind_rows(
+      # World total from MAgPIE (constructed)
+      data3 %>%
+        filter(str_starts(variable, "Taxes"),
+               model == "MAgPIE") %>%
+        mutate(variable = str_remove(variable, "^Taxes\\|?")) %>%
+        group_by(scenario, variable, period, unit, baseline) %>%  # no need to group by model after filtering
+        summarise(value = sum(value, na.rm = TRUE), .groups = "drop") %>%
+        mutate(region = "World", model = "MAgPIE"),
+      # World rows already present in data (any model)
+      data3 %>%
+        filter(str_starts(variable, "Taxes"),
+               region == "World") %>%
+        mutate(variable = str_remove(variable, "^Taxes\\|?"))
+    ) %>%
+      # keep only the two layers we want to stack
+      filter(variable %in% c("GHGenergy|REMIND", "GHGenergy|MAGPIE")) %>%
+      # control stacking order: bottom -> top
+      mutate(
+        variable = factor(variable, levels = c("GHGenergy|REMIND", "GHGenergy|MAGPIE")),
+        # make sure x is ordered for area stacking
+        period = as.integer(period)
+      )
+    
+
+     
+      p[[paste0("taxRevenueWorld")]] <- list(
+        plot =
+          ggplot(
+            plotdf,aes(x = period, y = value, fill = variable)
+          ) +
+          geom_area(alpha = 0.9, color = NA, position = "stack") +
+          facet_wrap(~scenario, ncol = 2,
+                     labeller = as_labeller(
+                       c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                     )
+          ) +
+          scale_fill_paletteer_d("dutchmasters::view_of_Delft",
+                                 name = 'Source',
+                                 labels = c('Energy system', 'Land sector')) +
+          labs(x = "Year", y = "Value", fill = "Variable") +
+          theme_minimal() +
+          theme(
+            legend.position = "bottom",
+            axis.text.x = element_text(angle = 45, hjust = 1),
+            strip.text = element_text(face = "bold"),
+            panel.grid.major.y = element_line(
+              color = "grey70",     # light grey
+              linewidth = 0.1,      # thinner line
+              linetype = "dashed"   # dashed style
+            ),
+            panel.grid.major.x = element_line(
+              color = "grey70",     # light grey
+              linewidth = 0.1,      # thinner line
+              linetype = "dashed"   # dashed style
+            ),
+            panel.grid.minor.x = element_blank(),
+            panel.grid.minor.y = element_blank(),
+            panel.background = element_rect(fill = "white", color = NA)
+          )
+        ,
+        
+        width  = 8,
+        height = 3
+      )
+      
+      
+    
+    
+    
+  }
+  
+
+  
+  
+  
+  #-------------End 6 Global tax revenue-------------
+    
+  
+  #--------------------------7.categorization of sector driver-----------------
+  
+  if(any(plotlist == 'theilSectorDriver' | allExport  )){
+  
+    plotdf <- plotdataIneq$ineq %>% filter(variable %in% c("ineq|deltTheilLShapley","ineq|deltTheilTShapley","ineq|TheilT", "ineq|TheilL"),
+                                   category %notin% c("Total","TotalWithTransf",'Consumption','Other commodities'),
+                                   region != 'World') %>%
+      pivot_wider(names_from = variable, values_from = value) %>%
+      mutate(pChangeTheilL =  `ineq|deltTheilLShapley`/`ineq|TheilL` * 100,
+             pChangeTheilT =  `ineq|deltTheilTShapley`/`ineq|TheilT` * 100) %>%
+      filter(period >= 2040)
+    
+    lims <- plotdf %>%
+      group_by(category) %>%
+      summarise(L = max(abs(c(`pChangeTheilL`,
+                              `pChangeTheilT`)), na.rm = TRUE),
+                .groups = "drop") %>%
+      mutate(xmin = 0, xmax = L, ymin = 0, ymax = L)
+    
+    regions <- levels(factor(plotdf$region))
+    
+    shape_vals <- c(21,22,23,24,25,0,1,2,3,4,5,6)  # 12 distinct shapes
+    names(shape_vals) <- regions[seq_along(shape_vals)]
+    
+    p[["theilSectorDriver"]] <- list(
+      plot = ggplot(plotdf,
+                    aes(x = `pChangeTheilL`,
+                        y = `pChangeTheilT`,
+                        color = region,
+                        shape = region)) +
+        geom_point(size = 1.2, alpha = 0.8) +
+        geom_blank(data = lims, aes(x = xmin, y = ymin), inherit.aes = FALSE) +
+        geom_blank(data = lims, aes(x = xmax, y = ymax), inherit.aes = FALSE) +
+        geom_abline(slope = 1, intercept = 0, linetype = 2) +
+        facet_wrap(~ category, ncol = 3, scales = "free") +
+        theme_minimal() +
+        labs(x = "% change, Theil's L", y = "% change, Theil's T") +
+        # Put the COLOR scale FIRST and give it the guide with 2 rows
+        paletteer::scale_color_paletteer_d(
+          name = "Region", palette = "PrettyCols::Summer",
+          guide = guide_legend(nrow = 2, byrow = TRUE,
+                               title.position = "left",
+                               title.hjust = 0, label.hjust = 0,
+                               override.aes = list(size = 3, alpha = 1))
+        ) +
+        # Shape scale uses the same name to merge, but no extra override (avoid warnings)
+        scale_shape_manual(name = "Region", values = shape_vals, guide = "legend") +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.box = "vertical",
+          legend.title = element_text(hjust = 0),
+          strip.text = element_text(face = "bold"),
+          panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white", color = NA)
+        )
+      
+      ,
+      
+      width  = 10,
+      height = 8
+      
+    )
+    
+    
+    
+    
+    
+    
+    
+    }
+  
+  
+  
+  #----------------------End 7. categorization of sector drivers---------------
+  
+  
   
   if(isDisplay){
     print(p)

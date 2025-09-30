@@ -202,44 +202,117 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     
   }else(print ('Other approach not yet implemented'))
   
-  
-  #add real consumption change
-  decileWelfChange <-   decileConsShare %>%
+
+  #Add total consumption budget effect (inequality neutral)
+  decileWelfChange <-
+    decileConsShare %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>%
     pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
-    mutate(`C_SSP2-PkBudg650` = log(`C_SSP2-PkBudg650` /  `C_SSP2-NPi2025`) * 100,
-           `C_SSP2-PkBudg1000` = log(`C_SSP2-PkBudg1000` /  `C_SSP2-NPi2025`) * 100 ) %>%
-    select( -`C_SSP2-NPi2025` ) %>%
-    mutate(category = 'Consumption') %>%
-    pivot_longer(cols = starts_with('C_SSP2'), names_to = 'scenario', values_to = 'decilWelfChange') %>%
+    {
+      wide <- .
+      # identify scenario columns (everything that isn’t an id column)
+      id_cols <- c("region", "period", "decileGroup")
+      scen_cols <- setdiff(names(wide), id_cols)
+      
+      # baseline column = any column whose name contains reference_run_name (first match if multiple)
+      baseline_col <- scen_cols[str_detect(scen_cols, fixed(reference_run_name))]
+      
+      # policy columns = any columns whose names contain any of the all_budgets tokens
+      policy_regex <- paste(all_budgets, collapse = "|")
+      policy_cols <- scen_cols[str_detect(scen_cols, policy_regex)]
+      
+      wide %>%
+        mutate(.base = .data[[baseline_col]]) %>%
+        mutate(
+          across(
+            all_of(policy_cols),
+            ~ log(.x / .base) * 100
+          )
+        ) %>%
+        select(all_of(id_cols), all_of(policy_cols)) %>%
+        pivot_longer(
+          cols = all_of(policy_cols),
+          names_to = "scenario",
+          values_to = "decilWelfChange"
+        ) %>%
+        mutate(category = "Consumption")
+    } %>%
     bind_rows(decileWelfChange)
   
   
-  #add lump sum recycling
-  transferCa <-   data1 %>%
-    filter(variable %in% c('Taxes|GHGenergy|MAGPIE','Taxes|GHGenergy|REMIND','Population'),
+  
+  #Tax revenue recycling
+
+  
+  # Progressive: equal per capita transfer
+  transferEpc <-   data1 %>%
+    filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
            scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
            region != 'World') %>%
     select(-model, -baseline) %>%
     calc_addVariable(
-      "`Taxes|GHGenergy`" = "`Taxes|GHGenergy|MAGPIE` + `Taxes|GHGenergy|REMIND`",
-      "transferCa" = "`Taxes|GHGenergy` * 1e3 / `Population`" ,
+      "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
+      "transferEpc" = "`Taxes|GHG` * 1e3 / `Population`" ,
       units = c('billion US$2017/yr', 'US$2017/person/yr')
     ) %>%
-    filter(variable == 'transferCa') %>%
+    filter(variable == 'transferEpc') %>%
     select(-variable, -unit) %>%
-    rename(transferCa = value)
-
+    rename(transferEpc = value) %>%
+    crossing(decileGroup = 1:10) %>%
+    arrange(scenario, region, period, decileGroup)
+  
   decileWelfChange <-
-  data2 %>%
+    data2 %>%
     filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
            region != 'World') %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>%
-    left_join(transferCa,by = c('scenario', 'region', 'period')) %>%
-    mutate(decilWelfChange = log(1+transferCa / consumptionCa) *100,
-           category = 'Transfer') %>%
-    select(-consumptionCa, -transferCa) %>%
+    left_join(transferEpc,by = c('scenario', 'region', 'period','decileGroup')) %>%
+    mutate(decilWelfChange = log(1+transferEpc / consumptionCa) *100,
+           category = 'TransferEpc') %>%
+    select(-consumptionCa, -transferEpc) %>%
     bind_rows(decileWelfChange)
+  
+  # Neutral: proportional
+  weight <- decileConsShare %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>%
+    mutate(
+      total = sum(consumptionCa, na.rm = TRUE),
+      consShare = if_else(total > 0, consumptionCa / total, NA_real_),
+      .by = c(scenario, region, period)
+    ) %>%
+    select(-total, -consumptionCa)
+
+  transferNeut <- data1 %>%
+    filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
+           scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
+           region != 'World') %>%
+    select(-model, -baseline) %>%
+    calc_addVariable(
+      "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
+      "`TaxesCa|GHG`" = "`Taxes|GHG` * 1e3 / `Population`" ,
+      units = c('billion US$2017/yr','US$2017/ca/yr')
+    ) %>%
+    filter(variable == "TaxesCa|GHG") %>%
+    select(-variable, -unit) %>%
+    crossing(decileGroup = 1:10) %>%
+    arrange(scenario, region, period, decileGroup) %>%
+    left_join(weight, by = c('scenario', 'region','period','decileGroup')) %>%
+    mutate(transferNeut = value * consShare * 10) %>%
+    select(-value, -consShare)
+
+  
+  decileWelfChange <-
+    data2 %>%
+    filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
+           region != 'World') %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>%
+    left_join(transferNeut,by = c('scenario', 'region', 'period','decileGroup')) %>%
+    mutate(decilWelfChange = log(1+transferNeut / consumptionCa) *100,
+           category = 'TransferNeut') %>%
+    select(-consumptionCa, -transferNeut) %>%
+    bind_rows(decileWelfChange)
+  
+
     
   return(decileWelfChange)
   

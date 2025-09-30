@@ -47,7 +47,7 @@ read_remindBaseline <- function( remind_path_base, do_plots = TRUE){
     mutate(carrier = 'FE') 
   
   #JZ:Mapping building FE carriers to HH consumption sectors, Electricity and Hydrogen are combined and called electricity,
-  #as Hydrogen quantity is extremely small
+  #as Hydrogen quantity is extremely small, and they are both considered as green energy
   
   other_fuels <- inner_join(
     FE_price %>% filter(sector == 'Buildings', carrier %in% c('Heat', 'Liquids', 'Solids')),

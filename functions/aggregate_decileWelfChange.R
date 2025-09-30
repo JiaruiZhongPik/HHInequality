@@ -1,15 +1,25 @@
 
 
 aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decileConsShare,
-                                        level = c("full", "grouped", "total", "totalWithTransf"), region = 'region') {
+                                        level = c("full", "grouped", "total", "totalWithTransfEpc", 
+                                                  "totalWithTransfNeut"), 
+                                        region = 'region') {
   
-  if(level != 'totalWithTransf'){
+  if(!startsWith(level, "totalWithTransf")){
     
     welf <- data1 %>%
-      filter(category != 'Transfer')
+      filter(!str_starts(category, "Transfer"))
     
-  } else {
-    welf <- data1
+  } else if(level == "totalWithTransfEpc" ) {
+    
+    welf <- data1 %>%
+      filter(!(str_starts(category, "transfer") & category != "transferEpc"))
+    
+  } else if (level == "totalWithTransfNeut") {
+    
+    welf <- data1 %>%
+      filter(!(str_starts(category, "transfer") & category != "transferNeut"))
+  
   }
 
   
@@ -32,7 +42,8 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decile
       level == "grouped" & category == "Other commodities" ~ "Other commodities",
       level == "grouped" & category == "Consumption" ~ "Consumption",
       level == "total" ~ "Total",
-      level == "totalWithTransf" ~ "TotalWithTransf"
+      level == "totalWithTransfEpc" ~ "TotalWithTransfEpc",
+      level == "totalWithTransfNeut" ~ "TotalWithTransfNeut"
     )) %>%
     group_by(scenario, region, decileGroup , period, group) %>%
     summarise( welfChangeGroup = sum(decilWelfChange, na.rm = T),

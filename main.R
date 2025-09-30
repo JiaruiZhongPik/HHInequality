@@ -71,43 +71,50 @@ options(dplyr.summarise.inform = FALSE,
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
-rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
-rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
+#rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
+#rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
+rootdir_remind <- "/p/tmp/jiaruizh/RemindMagpie/remind/output"
+rootdir_magpie <- "/p/tmp/jiaruizh/RemindMagpie/remind/magpie/output"
 all_runscens <- c("SSP2")
 reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"     
-all_budgets <- c("PkBudg650", "PkBudg1000")
+all_budgets <- c("PkBudg1000","PkBudg650")
 REMIND_pattern <- "REMIND_generic*.mif"
 
 #Modelling setting
 regions <- 'H12'                            # options are H12 or H21 
-regression <- 1                             # 1 if coefficients needs to be estimated. 
 regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
-regionmapping <- 'pool'                     # options are: "H12", "H21", "country", "pool"
-ConsData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors)
-gini_baseline <- 'poblete07'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
+regionGrouping <- 'pool'                    # options are: "H12", "H21", "country", "pool"
+consData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
+gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'_NPi2025_neutralDistribution_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
                              REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
 
 #Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affected
-#by smoothing. So I'd only use prices after that for simulation.
-data = prepare_modelData(all_paths,isExport = T) %>% 
-  filter(period %notin% c(1995,2000,2005,2010))
+#by smoothing. Only use prices after that for simulation.
+#Starting year moved to 2025, as GHG revenues from REMIND is positive before that 
+
+# data = prepare_modelData(all_paths,isExport = T) %>% 
+#   filter(period %notin% c(1995,2000,2005,2010,2015,2020))
+
+#instead of reading, load saved data for convenience
+load("RemindMagpie_250424.RData")
 
 
-if(regression){
-  coef = analyze_regression(regression_model = regression_model, ConsData = ConsData, regionmapping = regionmapping,
+if(consData == 'gcd'){
+  coef = analyze_regression(regression_model = regression_model, 
+                            consData = consData, regionGrouping = regionGrouping,
                             isDisplay = TRUE, isExport = T)
-} else {
+} else if(consData == 'mcc') {
   
-  coef = get_estimateMcc(regions = regions)
+  coef = get_estimateMcc(regionGrouping = regionGrouping)
   
 }
 
@@ -130,8 +137,7 @@ plot_inspection(outputPath = outputPath,
                 allExport=T)
 
 
-
-decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point) # unit %
+decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point) # unit log different change in %
 
 #to get some aggregated results
 # out <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, 
@@ -152,11 +158,16 @@ ineq <- compute_inequalityMetrics(data1 = decileWelfChange,
 #-------Plot-------
 #all plots
 plot_output(outputPath = outputPath, 
-            plotdataWelf  = decileWelfChange, 
+            data1 = decileWelfChange, 
             data2 = decileConsShare, 
             data3 = data, 
             plotdataIneq = ineq,
             micro_model = micro_model, fixed_point = fixed_point, allExport = T)
+
+#get ncc plots
+
+plot_outputNCC()
+
 
 #any individual plot
 p <- plot_output(outputPath = outputPath, 
@@ -165,8 +176,8 @@ p <- plot_output(outputPath = outputPath,
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = c('welfByPeriod','ineqWorld'),
-            micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
+            plotlist = c('taxRevenueWorld'),
+            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){
