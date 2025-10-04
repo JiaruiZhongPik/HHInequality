@@ -188,7 +188,7 @@ plot_inspection <- function( outputPath,
                   region != 'World')
         
         p[[paste0('revenue', scen)]] <- list(
-          plot = ggplot(plotdf1 %>% filter(variable %in% c("GHGenergy|REMIND","GHGenergy|MAGPIE")), 
+          plot = ggplot(plotdf1 %>% filter(variable %in% c("GHG|REMIND","GHG|MAGPIE")), 
                         aes(x = period, y = value, color = variable)) +
             geom_line(linewidth = 1) +
             facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot

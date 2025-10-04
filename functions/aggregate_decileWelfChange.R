@@ -1,24 +1,24 @@
 
 
 aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decileConsShare,
-                                        level = c("full", "grouped", "total", "totalWithTransfEpc", 
+                                        level = c("fullSec", "groupedSec", "totalSec", "totalWithTransfEpc", 
                                                   "totalWithTransfNeut"), 
                                         region = 'region') {
   
   if(!startsWith(level, "totalWithTransf")){
     
     welf <- data1 %>%
-      filter(!str_starts(category, "Transfer"))
+      filter(!str_starts(category, "Consumption"))
     
   } else if(level == "totalWithTransfEpc" ) {
     
     welf <- data1 %>%
-      filter(!(str_starts(category, "transfer") & category != "transferEpc"))
+      filter(!(str_starts(category, "Consumption") & category != "Consumption With EpcTransf"))
     
   } else if (level == "totalWithTransfNeut") {
     
     welf <- data1 %>%
-      filter(!(str_starts(category, "transfer") & category != "transferNeut"))
+      filter(!(str_starts(category, "Consumption") & category != "Consumption With NeutTransf"))
   
   }
 
@@ -36,12 +36,12 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decile
   # Re-group categories if needed
   df <-  welf %>%
     mutate(group = case_when(
-      level == "full" ~ category,
-      level == "grouped" & category %in% food_cats ~ "Food",
-      level == "grouped" & category %in% energy_cats ~ "Energy",
-      level == "grouped" & category == "Other commodities" ~ "Other commodities",
-      level == "grouped" & category == "Consumption" ~ "Consumption",
-      level == "total" ~ "Total",
+      level == "fullSec" ~ category,
+      level == "groupedSec" & category %in% food_cats ~ "Food",
+      level == "groupedSec" & category %in% energy_cats ~ "Energy",
+      level == "groupedSec" & category == "Other commodities" ~ "Other commodities",
+      level == "groupedSec" & category == "Consumption" ~ "Consumption",
+      level == "totalSec" ~ "TotalSec",
       level == "totalWithTransfEpc" ~ "TotalWithTransfEpc",
       level == "totalWithTransfNeut" ~ "TotalWithTransfNeut"
     )) %>%

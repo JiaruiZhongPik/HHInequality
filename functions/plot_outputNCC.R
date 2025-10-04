@@ -193,7 +193,7 @@ plot_outputNCC <- function(){
   
   # example for use
   figure1 <- plot_output(outputPath = outputPath, 
-                         plotdataWelf  = decileWelfChange, 
+                         data1  = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
@@ -205,7 +205,7 @@ plot_outputNCC <- function(){
   
   
   figure2 <- plot_output(outputPath = outputPath, 
-                         plotdataWelf  = decileWelfChange, 
+                         data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
@@ -216,7 +216,7 @@ plot_outputNCC <- function(){
   
   
   figure3 <- plot_output(outputPath = outputPath, 
-                         plotdataWelf  = decileWelfChange, 
+                         data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
@@ -225,7 +225,7 @@ plot_outputNCC <- function(){
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   figure4 <- plot_output(outputPath = outputPath, 
-                         plotdataWelf  = decileWelfChange, 
+                         data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
@@ -234,7 +234,7 @@ plot_outputNCC <- function(){
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   figure5 <- plot_output(outputPath = outputPath, 
-                         plotdataWelf  = decileWelfChange, 
+                         data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,

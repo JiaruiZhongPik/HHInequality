@@ -32,10 +32,10 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
 
   
 
-  #--------Compute the post inequality metrics (all channels included)-----------
+  #--------Compute the post inequality metrics (all channels included With neutral tranfer)-----------
   #get the total log points change
   welfByDecile <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                             data2 = decileConsShare, level = c("total"), 
+                                             data2 = decileConsShare, level = c("totalWithTransfNeut"), 
                                              region = 'decile')
   
   pop <- data3 %>%filter(variable == 'Population') %>% select(-unit,-variable,-baseline, -model) %>%
@@ -60,7 +60,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       
       .groups = "drop"
     ) %>%
-    mutate (category = 'Total')%>%
+    mutate (category = 'TotalWithTransfNeut')%>%
     pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value")
   
   
@@ -83,7 +83,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
       .groups = "drop"
     ) %>%
-    mutate (category = 'Total',
+    mutate (category = 'TotalWithTransfNeut',
             region = 'World')%>%
     pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
     bind_rows(dfIneq)
@@ -91,7 +91,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   
-  #--------Compute the post inequality metrics (all channels included and with Transfer)-----------
+  #--------Compute the post inequality metrics (all channels included and Epc Transfer)-----------
   
   # Epc transfer
   welfByDecileTransfEpc <- aggregate_decileWelfChange(data1 = decileWelfChange, 
@@ -147,66 +147,12 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     bind_rows(dfIneq)
   
   
-  #neutral transfer
-  welfByDecileTransfNeut <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                                      data2 = decileConsShare, 
-                                                      level = c("totalWithTransfNeut"), 
-                                                      region = 'decile')
-  
-  #Compute the prior and post inequality metrics over all categories for each region
-  dfIneq <- consBase %>%
-    merge(   welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
-    group_by(scenario, region, period) %>%
-    summarise(
-      `ineq|Gini` = Gini(consumptionCa),
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, type = 'L'),
-      `ineq|GiniPost` = Gini(consumptionCaPost),
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      
-      .groups = "drop"
-    ) %>%
-    mutate (category = 'TotalWithTransfNeut')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
-  
-  
-  #For world
-  dfIneq <- consBase %>%
-    merge( welfByDecileTransfNeut, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
-    merge(pop, by = c('scenario','region','period')) %>%
-    mutate(population = population/10) %>%
-    group_by(scenario, period) %>%
-    summarise(
-      `ineq|Gini` = weighted.gini(consumptionCa, population)[['Gini']],
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, population,type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, population,type = 'L'),
-      `ineq|GiniPost` = weighted.gini(consumptionCaPost, population)[['Gini']],
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      .groups = "drop"
-    ) %>%
-    mutate (category = 'TotalWithTransfNeut',
-            region = 'World')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
-  
-  
   
   
   #-----------Compute post inequality metrics for categorical impacts-----------
   welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, 
                                                 data2 = decileConsShare, 
-                                                level = c("full"), 
+                                                level = c("fullSec"), 
                                                 region = 'decile')
   
   
@@ -256,7 +202,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   #Shapley docomposition 
   #Step1:channel-wise shock
   dfShock <- consBase %>%
-    merge( data1 %>% filter(category != 'Transfer'), by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    merge( data1 %>% filter(!str_starts(category, "Consumption")), by = c('scenario', 'region', 'period', 'decileGroup')) %>%
     mutate(shock = consumptionCa * (exp(decilWelfChange/100)-1) ) %>%
     select( -consumptionCa, -decilWelfChange ) 
 
@@ -398,7 +344,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
 
   dfIneq <- dfIneq %>%
-    filter (category =='Total',variable =='ineq|deltTheilT') %>%
+    filter (category =='TotalWithTransfNeut',variable =='ineq|deltTheilT') %>%
     select(-variable, -category) %>%
     rename(deltTheil = value) %>%
     merge(shapleyRelaT, by = c('scenario','region','period')) %>%
@@ -410,7 +356,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     bind_rows(dfIneq)
   
   result[['ineq']] <- dfIneq %>%
-    filter (category =='Total',variable =='ineq|deltTheilL') %>%
+    filter (category =='TotalWithTransfNeut',variable =='ineq|deltTheilL') %>%
     select(-variable, -category) %>%
     rename(deltTheil = value) %>%
     merge(shapleyRelaL, by = c('scenario','region','period')) %>%

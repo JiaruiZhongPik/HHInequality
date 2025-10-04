@@ -235,7 +235,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
           names_to = "scenario",
           values_to = "decilWelfChange"
         ) %>%
-        mutate(category = "Consumption")
+        mutate(category = "Consumption With NeutTransf")
     } %>%
     bind_rows(decileWelfChange)
   
@@ -261,27 +261,6 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     crossing(decileGroup = 1:10) %>%
     arrange(scenario, region, period, decileGroup)
   
-  decileWelfChange <-
-    data2 %>%
-    filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
-           region != 'World') %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>%
-    left_join(transferEpc,by = c('scenario', 'region', 'period','decileGroup')) %>%
-    mutate(decilWelfChange = log(1+transferEpc / consumptionCa) *100,
-           category = 'TransferEpc') %>%
-    select(-consumptionCa, -transferEpc) %>%
-    bind_rows(decileWelfChange)
-  
-  # Neutral: proportional
-  weight <- decileConsShare %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>%
-    mutate(
-      total = sum(consumptionCa, na.rm = TRUE),
-      consShare = if_else(total > 0, consumptionCa / total, NA_real_),
-      .by = c(scenario, region, period)
-    ) %>%
-    select(-total, -consumptionCa)
-
   transferNeut <- data1 %>%
     filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
            scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
@@ -299,19 +278,61 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     left_join(weight, by = c('scenario', 'region','period','decileGroup')) %>%
     mutate(transferNeut = value * consShare * 10) %>%
     select(-value, -consShare)
-
   
-  decileWelfChange <-
-    data2 %>%
-    filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
-           region != 'World') %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>%
+  decileWelfChange <- decileConsShare %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>% 
+    left_join(transferEpc,by = c('scenario', 'region', 'period','decileGroup')) %>%
     left_join(transferNeut,by = c('scenario', 'region', 'period','decileGroup')) %>%
-    mutate(decilWelfChange = log(1+transferNeut / consumptionCa) *100,
-           category = 'TransferNeut') %>%
-    select(-consumptionCa, -transferNeut) %>%
+    mutate(transferEpc = if_else(scenario == "C_SSP2-NPi2025", 0, transferEpc),
+           transferNeut = if_else(scenario == "C_SSP2-NPi2025", 0, transferNeut),
+           consumptionCa  = consumptionCa - transferNeut + transferEpc) %>%
+    select(-transferNeut, -transferEpc) %>%
+    pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
+    {
+      wide <- .
+      # identify scenario columns (everything that isn’t an id column)
+      id_cols <- c("region", "period", "decileGroup")
+      scen_cols <- setdiff(names(wide), id_cols)
+      
+      # baseline column = any column whose name contains reference_run_name (first match if multiple)
+      baseline_col <- scen_cols[str_detect(scen_cols, fixed(reference_run_name))]
+      
+      # policy columns = any columns whose names contain any of the all_budgets tokens
+      policy_regex <- paste(all_budgets, collapse = "|")
+      policy_cols <- scen_cols[str_detect(scen_cols, policy_regex)]
+      
+      wide %>%
+        mutate(.base = .data[[baseline_col]]) %>%
+        mutate(
+          across(
+            all_of(policy_cols),
+            ~ log(.x / .base) * 100
+          )
+        ) %>%
+        select(all_of(id_cols), all_of(policy_cols)) %>%
+        pivot_longer(
+          cols = all_of(policy_cols),
+          names_to = "scenario",
+          values_to = "decilWelfChange"
+        ) %>%
+        mutate(category = "Consumption With EpcTransf")
+    } %>%
     bind_rows(decileWelfChange)
   
+  
+  # # Neutral: proportional
+  # weight <- decileConsShare %>%
+  #   filter(scenario == 'C_SSP2-NPi2025') %>%
+  #   select(scenario, region, period, decileGroup, consumptionCa) %>%
+  #   mutate(
+  #     total = sum(consumptionCa, na.rm = TRUE),
+  #     consShare = if_else(total > 0, consumptionCa / total, NA_real_),
+  #     .by = c(scenario, region, period)
+  #   ) %>%
+  #   select(-total, -consumptionCa,-scenario) %>%
+  #   tidyr::crossing(scenario = paste0( 'C_',all_runscens,'-',all_budgets )) 
+    
+
 
     
   return(decileWelfChange)

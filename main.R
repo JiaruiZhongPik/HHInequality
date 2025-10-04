@@ -126,7 +126,8 @@ if(consData == 'gcd'){
  #   missing = c('CAZ', 'JPN', 'USA'),
  #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
+decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, 
+                                           isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 
 
 #inspecting intermediate variables, particularly price shock and exposure
@@ -144,7 +145,7 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 #                            level = c("full"), region = 'region')
 # write.csv(out, 'result.csv')
 
-
+#To do needs debug for Neutral transfer
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
                                  data2 = decileConsShare, 
                                  data3 = data,
@@ -171,13 +172,13 @@ plot_outputNCC()
 
 #any individual plot
 p <- plot_output(outputPath = outputPath, 
-            plotdataWelf  = decileWelfChange, 
+            data1  = decileWelfChange, 
             data2 = decileConsShare, 
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = c('taxRevenueWorld'),
-            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
+            plotlist = c('ineqWorld'),
+            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){

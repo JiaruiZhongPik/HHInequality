@@ -5,11 +5,11 @@
 plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
   
   plotdataWelfWithTransfEpc <- data1 %>%
-    filter(category != 'TransferNeut') %>%
+    filter(category != 'Consumption With NeutTransf') %>%
     filter( period %notin% c(2010,2110,2130,2150))
   
   plotdataWelf <- data1 %>%
-    filter(category != 'TransferEpc') %>%
+    filter(category != 'Consumption With EpcTransf') %>%
     filter( period %notin% c(2010,2110,2130,2150))
   
   data3 <- data3 %>%
@@ -857,7 +857,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist=='welfByDecileSec')| allExport ){
     
     plotdf <- plotdataWelf %>%
-      filter( period <= 2100) %>%
+      filter( period <= 2100,
+              category != 'Consumption With NeutTransf') %>%
       mutate( category = factor(category, levels = allSec ))
 
     
@@ -1031,7 +1032,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     plotdf <- plotdataIneq[['ineq']] %>%
       filter( period <= 2100,
               region == 'World',
-              category == 'Total',
+              category == 'TotalWithTransfNeut',
               variable %in% c("ineq|Gini", "ineq|GiniPost",
                               "ineq|TheilT", "ineq|TheilTPost",
                               "ineq|TheilL", "ineq|TheilLPost")) %>%
@@ -1100,7 +1101,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     plotdf <- plotdataIneq[['ineq']] %>%
       filter( period <= 2100,
               region == 'World',
-              category %in% c('Total', 'TotalWithTransf'),
+              category %in% c('TotalWithTransfNeut','TotalWithTransfEpc'),
               startsWith(variable, "ineq|delt")) 
     
     # Automate over all scenarios
@@ -1126,10 +1127,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                   "ineq|deltTheilT" = "TheilT"
                                 )) +
         scale_linetype_manual(name = "Compensation",
-                              values = c("Total" = "solid", 
-                                         "TotalWithTransf" = "dashed"),
-                              labels = c("Total" = "No transfer",
-                                         "TotalWithTransf" = "Lump sum")) +
+                              values = c("TotalWithTransfNeut" = "solid", 
+                                         "TotalWithTransfEpc" = "dashed"),
+                              labels = c("TotalWithTransfNeut" = "No transfer",
+                                         "TotalWithTransfEpc" = "Lump sum")) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period)) +
         theme_minimal() +
@@ -1179,7 +1180,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     plotdf <- plotdataIneq[['ineq']] %>%
       filter( period <= 2100,
               region != 'World',
-              category == 'Total',
+              category == 'TotalWithTransfNeut',
               variable %in% c("ineq|Gini", "ineq|GiniPost",
                               "ineq|TheilT","ineq|TheilTPost",
                               "ineq|TheilL","ineq|TheilLPost")) %>%
@@ -1402,10 +1403,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     # }
    
     plotdf <- plotdataIneq[['ineq']] %>%
-      filter(period >= 2025, period <= 2100,
-             region != "World",
-             category %notin% c("Total", "Consumption"),
-             variable == "ineq|deltTheilLShapley") %>%
+      filter(
+        between(period, 2025, 2100),
+        region != "World",
+        !str_starts(coalesce(category, ""), "Total"),
+        variable == "ineq|deltTheilLShapley"
+      ) %>%
       mutate(
         category   = factor(category, levels = allSec),
         period_fac = factor(period),                 # keep labels
@@ -1919,10 +1922,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         mutate(variable = str_remove(variable, "^Taxes\\|?"))
     ) %>%
       # keep only the two layers we want to stack
-      filter(variable %in% c("GHGenergy|REMIND", "GHGenergy|MAGPIE")) %>%
+      filter(variable %in% c("GHG|REMIND", "GHG|MAGPIE")) %>%
       # control stacking order: bottom -> top
       mutate(
-        variable = factor(variable, levels = c("GHGenergy|REMIND", "GHGenergy|MAGPIE")),
+        variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
         # make sure x is ordered for area stacking
         period = as.integer(period)
       )
@@ -1988,7 +1991,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist == 'theilSectorDriver' | allExport  )){
   
     plotdf <- plotdataIneq$ineq %>% filter(variable %in% c("ineq|deltTheilLShapley","ineq|deltTheilTShapley","ineq|TheilT", "ineq|TheilL"),
-                                   category %notin% c("Total","TotalWithTransf",'Consumption','Other commodities'),
+                                   category %notin% c("Total","TotalWithTransfNeut","TotalWithTransfEpc",
+                                                      'Consumption','Other commodities'),
                                    region != 'World') %>%
       pivot_wider(names_from = variable, values_from = value) %>%
       mutate(pChangeTheilL =  `ineq|deltTheilLShapley`/`ineq|TheilL` * 100,
