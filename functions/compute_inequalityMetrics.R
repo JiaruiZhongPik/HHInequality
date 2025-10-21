@@ -13,6 +13,12 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
     )
   
+  
+  if (any(grepl("loOS|hiOS", mapping$remind_run))) {
+    mapping <- mapping %>%
+      mutate(remind_run = str_replace_all(remind_run, regex("RESCUE-T(?:ier|hier)2"), "SSP2"))
+  }
+  
   consBase <- data2 %>%
     filter(
       scenario %in% 
@@ -101,7 +107,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   #Compute the prior and post inequality metrics over all categories for each region
   dfIneq <- consBase %>%
-    merge(   welfByDecileTransf, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    merge(   welfByDecileTransfEpc, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
     mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     group_by(scenario, region, period) %>%
     summarise(

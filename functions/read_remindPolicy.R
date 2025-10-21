@@ -4,9 +4,9 @@
 read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDisplay = TRUE, isExport = TRUE){
   
   #for testing purpose
-  # remind_run = all_paths$remind_run[1]
-  # remind_path = all_paths$remind_path[1]
-  # remind_path_base = all_paths$remind_path_base[1]
+   # remind_run = all_paths$remind_run[1]
+   # remind_path = all_paths$remind_path[1]
+   # remind_path_base = all_paths$remind_path_base[1]
   
   remind_data <- 
     read.quitte(c(remind_path, remind_path_base)) %>%
@@ -18,7 +18,7 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
   #BS: the NPi-CCimp should be treated as a policy scenario (comparing it to the no-impact NPi)
   #BS: TODO added "CP" to list of identifiers of reference/base scenario for tests on ELEVATE scenarios. keep this?
   scen_base <- scens[grepl("Base|NPi|npi-base|CP",scens) & !grepl("NPi-CCimp",scens)] #added npi-base and npi-policy to align with the above
-  scen_policy <- scens[grepl("1150|1000|900|650|500|Budg|NDC|npi-policy|NPi-CCimp",scens)] #added budget numbers here for use with hybrid runs in SDP review
+  scen_policy <- scens[grepl("1150|1000|900|650|500|Budg|NDC|npi-policy|NPi-CCimp|loOS|hiOS",scens)] #added budget numbers here for use with hybrid runs in SDP review
   
   #JZ: PVP|good is the shadow price not the relative price of other commodities.
   #As the macro output is assumed to be the numeraire good, it's price by assumption
@@ -44,8 +44,6 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     rename( value = deltPrice ) %>%
     bind_rows(Good_price)
 
-    
-  
   
   FE_price <-
     remind_data %>% 
@@ -155,32 +153,27 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     select(-sector, -carrier) %>%
     rename(unit = quantity_unit, value = quantity)
   
-  #Tax revenue 
-  Tax_remind = 
-  remind_data %>% 
-  calc_addVariable(
-    "`Taxes|EmiC02FFI`" = "`Emi|CO2|Energy and Industrial Processes`*1e6 * `Price|Carbon`/ 1e9",
-    # taxes from non-LU CH4 (in Mt CH4) and N2O (in kt N2O) emissions
-    "`Taxes|EmiCH4Energy`" = "(`Emi|CH4|+|Energy Supply` + `Emi|CH4|+|Extraction`)*1e6 * 28 * `Price|Carbon`/1e9",
-    "`Taxes|EmiN2OEnergy`" = "(`Emi|N2O|+|Energy Supply` + `Emi|N2O|+|Industry` + `Emi|N2O|+|Transport`) *1e3 * 265 * `Price|Carbon`/1e9",
-    "`Taxes|GHG|REMIND`" = "`Taxes|EmiC02FFI` + `Taxes|EmiCH4Energy` + `Taxes|EmiN2OEnergy`",
-    # LUC revenues are not used for redistribution, so don't need these
-    # "`Taxes|EmiCO2LUC`" = "`Emi|CO2|Land-Use Change`*1e6 * `Price|Carbon`/ 1e9",
-    # "`Taxes|EmiCO2LUC|Rel`" = "`Taxes|EmiCO2LUC`/`GDP|MER|Base`",
-    units = c(
-      "billion US$2017/yr","billion US$2017/yr","billion US$2017/yr","billion US$2017/yr"
-    ))  %>%
-    filter(variable %in% c('Taxes|EmiC02FFI','Taxes|EmiCH4Energy','Taxes|EmiN2OEnergy','Taxes|GHG|REMIND'))%>%
-    mutate(value = pmax(value, 0)) # remove negative revenues
-    
-
+  #Note JZ: the revenue computed with this approach is similar to the REMIND2 
+  #reported variable "Revenue|Government|Tax|Carbon", consider to use that.
+  
+  Tax_remind <- 
+   remind_data %>% 
+    filter( variable == 'Revenue|Government|Tax|Carbon' ) %>%
+    mutate( #value = pmax(value, 0),
+           variable = "Taxes|GHG|REMIND" )
+  print("warning: take negative revenues, yet this mess up revenue recycling, 
+        should be balanced")
+  
+  carbonPrice <- remind_data %>% 
+    filter( variable == 'Price|Carbon' )
   
   remind_data <- bind_rows(remind_data, FE_consumerPrice,  
                            FE_consumerQuantityBuilding,
                            FE_consumerPriceDelt,
                            Good_price,
-                           Tax_remind)
-  
+                           Tax_remind,
+                           carbonPrice)
+
   
   remind_data <- remind_data %>% 
     filter(variable %in% c('GDP|MER','GDP|PPP','Population',
@@ -195,10 +188,11 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
                            "relaPrice|Buildings|Gases",
                            "relaPrice|Buildings|Other fuels",
                            "relaPrice|Other commodities",
-                           'Taxes|EmiC02FFI',
-                           'Taxes|EmiCH4Energy',
-                           'Taxes|EmiN2OEnergy',
-                           'Taxes|GHG|REMIND'
+                           # 'Taxes|EmiC02FFI',
+                           # 'Taxes|EmiCH4Energy',
+                           # 'Taxes|EmiN2OEnergy',
+                           'Taxes|GHG|REMIND',
+                           'Price|Carbon'
                            ),
            scenario == scen_policy
     ) %>% 

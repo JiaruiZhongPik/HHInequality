@@ -223,6 +223,53 @@ plot_inspection <- function( outputPath,
   
   #-----End. inspecting exposure/expnditure share by region and category---------
   
+  #------5. inspecting carbon price dynamics -------------
+    if(any(plotlist == "carbonPrice") | allExport){
+      
+      
+      plotdf <- dataPrice %>% 
+        filter (variable=='Price|Carbon') %>%
+        mutate(variable = 'Carbon price')
+      
+
+        
+        p[[paste0('carbonPrice', scen)]] <- list(
+          plot = ggplot(plotdf, 
+                        aes(x = period, y = value, color = scenario)) +
+            geom_line(linewidth = 1) +
+            facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot
+            scale_color_paletteer_d("ggthemes::Classic_10") +
+            labs(
+              x = "Year",
+              y = "Value",
+              color = "Variable",
+              linetype = "Scenario"
+            ) +
+            theme_minimal() +
+            theme(
+              legend.position = "bottom",
+              axis.text.x = element_text(angle = 45, hjust = 1),
+              strip.text = element_text(face = "bold")
+            )
+          
+          ,
+          
+          width = 10,
+          height = 8
+          
+        )
+        
+      }
+      
+      
+      
+      
+      
+    }
+    
+    #-----End. inspecting exposure/expnditure share by region and category---------
+    
+    
   #--------------------Export--------------------------------------------
   if(isDisplay){
     print(p)

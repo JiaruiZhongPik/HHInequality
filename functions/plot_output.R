@@ -57,30 +57,38 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                     alpha = 0.3, size = 0.2) +
         scale_color_manual(
           values = c("C_SSP2-PkBudg1000" = "#e8ab67",
-                     "C_SSP2-PkBudg650"  = "#264f78"),
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67",
+                     "C_SSP2-loOS-def" = "#264f78"),
           labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
           ) +
         
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", linewidth = 0.7) +
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", linewidth = 0.7)+
         
         #  Custom color mapping for boxes and lines
         scale_fill_manual(
           values = c("C_SSP2-PkBudg1000" = "#e8ab67", 
-                     "C_SSP2-PkBudg650"  = "#779ec6"),
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def"  = "#779ec6"),
           labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C")) +
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period)) +
         
         # Labels and styling
-        labs(x = "Year", y = "Consumpition Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
@@ -131,20 +139,34 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
                   linewidth = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                                      "C_SSP2-PkBudg650"  = "#264f78",
+                                      "C_SSP2-hiOS-def" = "#e8ab67", 
+                                      "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                   "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                   "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                   "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
                      shape = 20, size = 2.5, color = "gray30") +
         
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
@@ -197,30 +219,43 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
-        
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", linewidth = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-loOS-def" ), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", linewidth = 0.7)+
         
         #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period))+
         
         # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
@@ -268,20 +303,34 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
                   linewidth = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        )+
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
                      shape = 20, size = 2.5, color = "gray30") +
         
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
@@ -335,30 +384,44 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", linewidth = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", linewidth = 0.7)+
         
         #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period))+
         
         # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
@@ -406,20 +469,34 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
                   size = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
                      shape = 20, size = 2.5, color = "gray30") +
         
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
@@ -468,20 +545,34 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
                   size = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
                      shape = 20, size = 2.5, color = "gray30") +
         
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         facet_wrap(~ region)+
         theme_minimal() +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
@@ -528,30 +619,43 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
-        
+
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", size = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", size = 0.7)+
-        
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
+      
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))+
+                           labels = unique(plotdataWelf$period)) +
         
         # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
@@ -605,20 +709,34 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
                   size = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
                      shape = 20, size = 2.5, color = "gray30") +
         
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         facet_wrap(~ region)+
         theme_minimal() +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.005, 0.99), na.rm = TRUE)) +
@@ -635,7 +753,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   
   if(any(plotlist=='welfByPeriodRegEne')| allExport ){
-    #todo: is using weighted average better?
+
     dataDecile <- plotdataWelf %>%
       filter(period <= 2100,
              category %in% eneSec) %>%
@@ -666,30 +784,42 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
-        
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", size = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
-                  color = "#264f78", size = 0.7)+
-        
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
+                  color = "#264f78", size = 0.7) +
+    
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period))+
         
         # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
@@ -742,14 +872,28 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line(data = avg_df_decile, 
                   aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
                   size = 0.7) +
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light orange
-          "C_SSP2-PkBudg650"  = "#779ec6"   # soft purple
-        )) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#ba7a31",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        )) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
                      position = position_dodge(width = 0.7), 
@@ -803,25 +947,38 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
-        scale_color_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",
-          "C_SSP2-PkBudg650"  = "#264f78"
-        ))+
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                     "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                     "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                     "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+        ) +
         
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg1000", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanWelfChange),
                   color = "#ba7a31", linewidth = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario == "C_SSP2-PkBudg650", period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanWelfChange),
                   color = "#264f78", size = 0.7)+
         
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(values = c(
-          "C_SSP2-PkBudg1000" = "#e8ab67",  # light blue
-          "C_SSP2-PkBudg650"  = "#779ec6"   # mid blue
-        )) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period))+
         
@@ -876,7 +1033,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         scale_fill_paletteer_d("dutchmasters::view_of_Delft") +
         facet_wrap(~scenario, ncol = 2) +
         # Labels and styling
-        labs(x = "Decile", y = "Welfare Change (%)", fill = "FE category") +
+        labs(x = "Decile", y = "Real Consumption Change (%)", fill = "FE category") +
         coord_cartesian(ylim = quantile(plotdataWelf$decilWelfChange, probs = c(0.01, 0.99), na.rm = TRUE)) +
         theme_minimal() +
         theme(
@@ -894,7 +1051,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist=='globalWelfBySec')| allExport ){
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("full"), region = 'global') %>%
+                                         level = c("fullSec"), region = 'global') %>%
       mutate(category = factor(category, levels = allSec))
     
     
@@ -906,7 +1063,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         facet_wrap(~ scenario) +
         labs(
           x = "Year",
-          y = "Welfare Change (%)",
+          y = "Real Consumption Change (%)",
           fill = "Category"
         ) +
         theme_minimal() +
@@ -1058,7 +1215,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         facet_wrap(~scenario, ncol = 2,
                    labeller = as_labeller(
                      c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                       "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                       "C_SSP2-loOS-def"  = "SSP2-1.5°C LO")
                    )
                    ) +
         # Labels and styling
@@ -1114,7 +1273,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         facet_wrap(~scenario, ncol = 2,
                    labeller = as_labeller(
                      c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C"))
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                       "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                       "C_SSP2-loOS-def"  = "SSP2-1.5°C LO"))
                    ) +
         # Labels and styling
         labs(x = "Year", y = "Change in inequality metrics", fill = "FE category") +
@@ -1129,7 +1290,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         scale_linetype_manual(name = "Compensation",
                               values = c("TotalWithTransfNeut" = "solid", 
                                          "TotalWithTransfEpc" = "dashed"),
-                              labels = c("TotalWithTransfNeut" = "No transfer",
+                              labels = c("TotalWithTransfNeut" = "Neutral",
                                          "TotalWithTransfEpc" = "Lump sum")) +
         scale_x_continuous(breaks = unique(plotdataWelf$period),
                            labels = unique(plotdataWelf$period)) +
@@ -1215,13 +1376,21 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
             "C_SSP2-PkBudg1000.before" = "solid",
             "C_SSP2-PkBudg1000.after" = "dashed",
             "C_SSP2-PkBudg650.before" = "solid",
-            "C_SSP2-PkBudg650.after" = "dotted"
+            "C_SSP2-PkBudg650.after" = "dotted",
+            "C_SSP2-hiOS-def.before" = "solid",
+            "C_SSP2-hiOS-def.after" = "dashed",
+            "C_SSP2-loOS-def.before" = "solid",
+            "C_SSP2-loOS-def.after" = "dotted"
           ),
           labels = c(
             "C_SSP2-PkBudg1000.before" = "SSP_NPi2025",
             "C_SSP2-PkBudg1000.after" = "PkBudg1000",
             "C_SSP2-PkBudg650.before" = "SSP_NPi2025",
-            "C_SSP2-PkBudg650.after" = "PkBudg650"
+            "C_SSP2-PkBudg650.after" = "PkBudg650",
+            "C_SSP2-hiOS-def.before" = "SSP_NPi2025",
+            "C_SSP2-hiOS-def.after" = "SSP2-1.5°C HO",
+            "C_SSP2-loOS-def.before" = "SSP_NPi2025",
+            "C_SSP2-loOS-def.after" = "SSP2-1.5°C LO"
           )
         ) + 
         theme_minimal() +
@@ -1416,6 +1585,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         scen_off   = recode(scenario,                # nudge scenarios left/right
                             "C_SSP2-PkBudg1000" = -0.22,
                             "C_SSP2-PkBudg650"  =  0.22,
+                            "C_SSP2-hiOS-def" = -0.22,
+                            "C_SSP2-loOS-def" = 0.22,
                             .default = 0),
         x = period_num + scen_off
       )
@@ -1440,11 +1611,15 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           name = "Scenario",
           values = c(
           "C_SSP2-PkBudg1000" = 4,   # filled circle
-          "C_SSP2-PkBudg650"  = 3    # filled triangle
+          "C_SSP2-PkBudg650"  = 3,    # filled triangle
+          "C_SSP2-hiOS-def" = 4,
+          "C_SSP2-loOS-def" = 3
         ),
         labels = c(
           "C_SSP2-PkBudg1000" = "SSP2-2°C",
-          "C_SSP2-PkBudg650"  = "SSP2-1.5°C"
+          "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+          "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+          "C_SSP2-loOS-def" = "SSP2-1.5°C LO"
         )
         )+
         facet_wrap(~ region, ncol = 3) +
@@ -1477,6 +1652,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
 
     
   }
+  
   if(any(plotlist == 'ineqTheilTRegBySecbyScen' | allExport  )){
     
     plotdf <- plotdataIneq[['ineq']] %>%
@@ -1515,11 +1691,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           name = "Scenario",
           values = c(
             "C_SSP2-PkBudg1000" = 4,   # filled circle
-            "C_SSP2-PkBudg650"  = 3    # filled triangle
+            "C_SSP2-PkBudg650"  = 3,    # filled triangle
+            "C_SSP2-hiOS-def" = 4,
+            "C_SSP2-loOS-def" = 3
+            
           ),
           labels = c(
             "C_SSP2-PkBudg1000" = "SSP2-2°C",
-            "C_SSP2-PkBudg650"  = "SSP2-1.5°C"
+            "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+            "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+            "C_SSP2-loOS-def" = "SSP2-1.5°C LO"
           )
         )+
         facet_wrap(~ region, ncol = 3) +
@@ -1601,7 +1782,13 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           linetype = 'dashed',
           size = 0.8
         ) +
-        facet_wrap(~scenario) +
+        facet_wrap(~scenario,
+                   labeller = as_labeller(
+                     c("C_SSP2-PkBudg1000" = "SSP2-2°C",
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                       "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                       "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
+                     )) +
         labs(
           x = "Year",
           y = "Change in Inequality (Theil)",
@@ -1684,7 +1871,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         facet_wrap(~scenario, ncol = 2,
                    labeller = as_labeller(
                      c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                       "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                       "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                       "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
                    )
         ) +
         labs(
@@ -1777,7 +1966,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           facet_wrap(~scenario, ncol = 2,
                      labeller = as_labeller(
                        c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                         "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                         "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
                      )
           ) +
           labs(
@@ -1807,7 +1998,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       #TheilL
       
   if(any(plotlist == 'ineqGlobalWithinRegTheilL' | allExport  )){
-     plotdf <- plotdataIneq[['theilLDecomp']]%>%
+     
+    plotdf <- plotdataIneq[['theilLDecomp']]%>%
         mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
                `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
                `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
@@ -1843,7 +2035,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           facet_wrap(~scenario, ncol = 2,
                      labeller = as_labeller(
                        c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
+                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+                         "C_SSP2-hiOS-def" = "SSP2-1.5°C HO",
+                         "C_SSP2-loOS-def" = "SSP2-1.5°C LO")
                      )) +
           labs(
             x = "Year",
@@ -1928,44 +2122,59 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
         # make sure x is ordered for area stacking
         period = as.integer(period)
-      )
+      ) %>%
+      filter(period <= 2100)
     
 
-     
+    sumdf <- plotdf %>%
+      group_by(scenario, period) %>%
+      summarise(total = sum(value, na.rm = TRUE), .groups = "drop") 
+    
       p[[paste0("taxRevenueWorld")]] <- list(
         plot =
-          ggplot(
-            plotdf,aes(x = period, y = value, fill = variable)
+          ggplot(plotdf, aes(x = period, y = value, fill = variable)) +
+          geom_area(alpha = 0.7, color = NA, position = "stack") +
+          geom_line(
+            data = sumdf,
+            aes(x = period, y = total, color = "Total"),
+            inherit.aes = FALSE,
+            linewidth = 1,
+            linetype = "solid"
           ) +
-          geom_area(alpha = 0.9, color = NA, position = "stack") +
-          facet_wrap(~scenario, ncol = 2,
-                     labeller = as_labeller(
-                       c("C_SSP2-PkBudg1000" = "SSP2-2°C",
-                         "C_SSP2-PkBudg650"  = "SSP2-1.5°C")
-                     )
+          facet_wrap(
+            ~ scenario, ncol = 2,
+            labeller = as_labeller(c(
+              "C_SSP2-PkBudg1000" = "SSP2-2°C",
+              "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
+              "C_SSP2-hiOS-def"   = "SSP2-1.5°C HO",
+              "C_SSP2-loOS-def"   = "SSP2-1.5°C LO"
+            ))
           ) +
-          scale_fill_paletteer_d("dutchmasters::view_of_Delft",
-                                 name = 'Source',
-                                 labels = c('Energy system', 'Land sector')) +
-          labs(x = "Year", y = "Value", fill = "Variable") +
+          scale_fill_paletteer_d(
+            "dutchmasters::view_of_Delft",
+            name   = "Source",
+            labels = c("Energy system", "Land sector")
+          ) +
+          scale_color_manual(
+            name   = "",
+            values = c("Total" = "#446482"),        # one source of truth for the line color
+            labels = c("Total" = "Total revenue")
+          ) +
+          guides(
+            fill  = guide_legend(order = 1),
+            color = guide_legend(order = 2, override.aes = list(linetype = "solid", linewidth = 1.2))
+          ) +
+          labs(x = "Year", y = "Value") +           # don't override fill title here
           theme_minimal() +
           theme(
             legend.position = "bottom",
             axis.text.x = element_text(angle = 45, hjust = 1),
             strip.text = element_text(face = "bold"),
-            panel.grid.major.y = element_line(
-              color = "grey70",     # light grey
-              linewidth = 0.1,      # thinner line
-              linetype = "dashed"   # dashed style
-            ),
-            panel.grid.major.x = element_line(
-              color = "grey70",     # light grey
-              linewidth = 0.1,      # thinner line
-              linetype = "dashed"   # dashed style
-            ),
+            panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+            panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
             panel.grid.minor.x = element_blank(),
             panel.grid.minor.y = element_blank(),
-            panel.background = element_rect(fill = "white", color = NA)
+            panel.background   = element_rect(fill = "white", color = NA)
           )
         ,
         

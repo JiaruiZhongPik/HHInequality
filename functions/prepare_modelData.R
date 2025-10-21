@@ -65,6 +65,17 @@ prepare_modelData <- function (all_paths,isDisplay = F, isExport = F){
       scenario= str_remove(scenario, "-(rem|mag)-\\d+$")
     ) 
   
+  #For RESCUE scenarios, the budegt runs are renamed to include underlying SSPs
+  
+  if (any(grepl("loOS-def|hiOS-def", all_budgets, fixed = FALSE))) {
+    
+    data <- data %>%
+      mutate(scenario = str_replace(scenario, "RESCUE-Tier2", "SSP2"))
+    
+  } 
+  
+  
+  
   return(data)
   
 }

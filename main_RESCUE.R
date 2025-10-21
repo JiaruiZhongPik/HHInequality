@@ -73,11 +73,11 @@ scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
 #rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
 #rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
-rootdir_remind <- "/p/tmp/jiaruizh/RemindMagpie/remind/output"
-rootdir_magpie <- "/p/tmp/jiaruizh/RemindMagpie/remind/magpie/output"
+rootdir_remind <- "/p/projects/rescue/tier2_scenarios/v1/cpl/remind/output"
+rootdir_magpie <- "/p/projects/rescue/tier2_scenarios/v1/cpl/magpie/output"
 all_runscens <- c("SSP2")
 reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"     
-all_budgets <- c("PkBudg1000","PkBudg650")
+all_budgets <- c("loOS-def","hiOS-def")
 REMIND_pattern <- "REMIND_generic*.mif"
 
 #Modelling setting
@@ -91,11 +91,12 @@ micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of ye
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'_NPi2025_neutralDistribution_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
-                             REMIND_pattern,rootdir_remind, rootdir_magpie,all_runscens,all_budgets)
+                             REMIND_pattern,rootdir_remind, rootdir_magpie,
+                             all_runscens,all_budgets)
 
 #Simulation excludes years before 2015. In REMIND, the 2005 price is not stable and 2010 is affected
 #by smoothing. Only use prices after that for simulation.
@@ -105,7 +106,7 @@ data = prepare_modelData(all_paths,isExport = T) %>%
   filter(period %notin% c(1995,2000,2005,2010,2015,2020))
 
 #instead of reading, load saved data for convenience
-load("RemindMagpie_250424.RData")
+load("RESCUE.RData")
 
 
 if(consData == 'gcd'){
@@ -122,9 +123,9 @@ if(consData == 'gcd'){
 #I wanted to use EUR for other developed world but found that EUR has only 
 #limited observations too, so this is not a good strategy
 
- # missingMapping <- data.frame(
- #   missing = c('CAZ', 'JPN', 'USA'),
- #   replaceWith = c('EUR', 'EUR', 'EUR'))
+# missingMapping <- data.frame(
+#   missing = c('CAZ', 'JPN', 'USA'),
+#   replaceWith = c('EUR', 'EUR', 'EUR'))
 
 decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, 
                                            isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
@@ -147,9 +148,9 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 
 #To do needs debug for Neutral transfer
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
-                                 data2 = decileConsShare, 
-                                 data3 = data,
-                                 montecarlo = TRUE, n_perms = 300)
+                                  data2 = decileConsShare, 
+                                  data3 = data,
+                                  montecarlo = TRUE, n_perms = 300)
 
 
 #validate the theil combiled in total and decomposed
@@ -172,13 +173,13 @@ plot_outputNCC()
 
 #any individual plot
 p <- plot_output(outputPath = outputPath, 
-            data1  = decileWelfChange, 
-            data2 = decileConsShare, 
-            data3 = data, 
-            plotdataIneq = ineq,
-            exampleReg = 'IND',
-            plotlist = c('ineqWorld'),
-            micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
+                 data1  = decileWelfChange, 
+                 data2 = decileConsShare, 
+                 data3 = data, 
+                 plotdataIneq = ineq,
+                 exampleReg = 'IND',
+                 plotlist = c('ineqWorld'),
+                 micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){

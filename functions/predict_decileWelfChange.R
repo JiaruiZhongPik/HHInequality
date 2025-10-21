@@ -13,6 +13,19 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     names() %>%
     stringr::str_remove("^share\\|")  
   
+  mapping <- all_paths %>%
+    select( remind_run, remind_base ) %>%
+    mutate(
+      remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
+      remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
+    )
+  
+  if (any(grepl("loOS|hiOS", mapping$remind_run))) {
+    mapping <- mapping %>%
+      mutate(remind_run = str_replace_all(remind_run, regex("RESCUE-T(?:ier|hier)2"), "SSP2"))
+  }
+  
+  
   if( length(sectors) == 3 ){
     
     deltPriceEne <- data1 %>%
@@ -106,13 +119,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
       
     }else if (fixed_point == 'base'){
       
-      mapping <- all_paths %>%
-        select( remind_run, remind_base ) %>%
-      mutate(
-        remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
-        remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
-      )
-      
+
       baseConsShare <- data2 %>%
         filter(
           scenario %in% 
@@ -141,13 +148,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
       
     } else if (fixed_point == 'midpoint') {
       
-      mapping <- all_paths %>%
-        select( remind_run, remind_base ) %>%
-        mutate(
-          remind_base = str_remove(remind_base, "-(rem|mag)-\\d+$"),
-          remind_run  = str_remove(remind_run, "-(rem|mag)-\\d+$")
-        )
-      
+
       baseConsShare <- data2 %>%
         filter(
           scenario %in% 
@@ -261,6 +262,17 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     crossing(decileGroup = 1:10) %>%
     arrange(scenario, region, period, decileGroup)
   
+  weight <- decileConsShare %>%
+    filter(scenario == 'C_SSP2-NPi2025') %>%
+    select(scenario, region, period, decileGroup, consumptionCa) %>%
+    mutate(
+      total = sum(consumptionCa, na.rm = TRUE),
+      consShare = if_else(total > 0, consumptionCa / total, NA_real_),
+      .by = c(scenario, region, period)
+    ) %>%
+    select(-total, -consumptionCa,-scenario) %>%
+    tidyr::crossing(scenario = paste0( 'C_',all_runscens,'-',all_budgets ))
+  
   transferNeut <- data1 %>%
     filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
            scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
@@ -320,17 +332,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     bind_rows(decileWelfChange)
   
   
-  # # Neutral: proportional
-  # weight <- decileConsShare %>%
-  #   filter(scenario == 'C_SSP2-NPi2025') %>%
-  #   select(scenario, region, period, decileGroup, consumptionCa) %>%
-  #   mutate(
-  #     total = sum(consumptionCa, na.rm = TRUE),
-  #     consShare = if_else(total > 0, consumptionCa / total, NA_real_),
-  #     .by = c(scenario, region, period)
-  #   ) %>%
-  #   select(-total, -consumptionCa,-scenario) %>%
-  #   tidyr::crossing(scenario = paste0( 'C_',all_runscens,'-',all_budgets )) 
+
     
 
 
