@@ -8,25 +8,38 @@ set_pathScenario<-function (reference_run_name, scenario_mode,write_namestring, 
 
   run_prefix <- "C_"
 
-  remind_iteration <- "-rem-5"
-  magpie_iteration <- "-mag-4"
+  remind_iteration <- case_when(
+    grepl("EocBudg500-OAE_on", all_budgets) ~ "-rem-10",
+    TRUE                                    ~ "-rem-5"
+    )
+  
+  magpie_iteration <- case_when(
+    grepl("EocBudg500-OAE_on", all_budgets) ~ "-mag-9",
+    TRUE                                    ~ "-mag-4"
+  )
 
+  budget_runscens <- case_when(
+    grepl("loOS-def|hiOS-def", all_budgets) ~ "RESCUE-Tier2",
+    grepl("EocBudg500-OAE_on", all_budgets) ~ "RESCUE-dir-v5p0",
+    TRUE                                     ~ all_runscens
+  )
   
-  if (any(grepl("loOS-def|hiOS-def", all_budgets, fixed = FALSE))) {
-    budget_runscens    <- "RESCUE-Tier2"
-    reference_runscens <- all_runscens
-  } else {
-    budget_runscens    <- all_runscens
-    reference_runscens <- all_runscens
-  }
+  reference_runscens <- case_when(
+    grepl("EocBudg500-OAE_on", all_budgets) ~ "SSP2EU",
+    TRUE                                     ~ all_runscens
+  )
   
+  reference_run_name <- case_when(
+    grepl("EocBudg500-OAE_on", all_budgets) ~ "NPi",
+    TRUE                                     ~ reference_run_name
+  )
   
   
   # generate file paths based on settings above
   remind_run_all <- mapply(scenario_combiner, budget_runscens, all_budgets, prestring = run_prefix, addstring = remind_iteration, USE.NAMES = FALSE)
-  remind_base_all <- mapply(scenario_combiner, reference_runscens, rep(reference_run_name,length(remind_run_all)), prestring = run_prefix, addstring = remind_iteration, USE.NAMES = FALSE)
+  remind_base_all <- mapply(scenario_combiner, reference_runscens,  reference_run_name, prestring = run_prefix, addstring = remind_iteration, USE.NAMES = FALSE)
   magpie_run_all <- mapply(scenario_combiner, budget_runscens, all_budgets, prestring = run_prefix, addstring = magpie_iteration, USE.NAMES = FALSE)
-  magpie_base_all <- mapply(scenario_combiner, reference_runscens, rep(reference_run_name,length(magpie_run_all)), prestring = run_prefix, addstring = magpie_iteration, USE.NAMES = FALSE)
+  magpie_base_all <- mapply(scenario_combiner, reference_runscens, reference_run_name, prestring = run_prefix, addstring = magpie_iteration, USE.NAMES = FALSE)
   
   
   all_paths <- 

@@ -70,7 +70,8 @@ prepare_modelData <- function (all_paths,isDisplay = F, isExport = F){
   if (any(grepl("loOS-def|hiOS-def", all_budgets, fixed = FALSE))) {
     
     data <- data %>%
-      mutate(scenario = str_replace(scenario, "RESCUE-Tier2", "SSP2"))
+      mutate(scenario = str_replace(scenario, "RESCUE-Tier2", "SSP2"),
+             scenario = str_replace(scenario, "RESCUE-dir-v5p0", "SSP2"))
     
   } 
   

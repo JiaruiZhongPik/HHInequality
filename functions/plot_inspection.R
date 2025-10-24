@@ -265,7 +265,7 @@ plot_inspection <- function( outputPath,
       
       
       
-    }
+    
     
     #-----End. inspecting exposure/expnditure share by region and category---------
     

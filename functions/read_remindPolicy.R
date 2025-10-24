@@ -178,6 +178,8 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
   remind_data <- remind_data %>% 
     filter(variable %in% c('GDP|MER','GDP|PPP','Population',
                            'Consumption',
+                           'Price|Carbon',
+                           'Interest Rate (t+1)/(t-1)|Real',
                            "FE|++|Transport",
                            "FE|Buildings|Other fuels","FE|Buildings|Gases","FE|Buildings|Electricity",
                            "Price|Transport|FE",
