@@ -84,6 +84,17 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decile
       rename(welfChange = weighted_welfare,
              category = group)
     
+  }else if ( region == 'globalDecile' ) {
+    
+    welfAgg <-  df %>%
+      group_by(scenario, period, decileGroup, group) %>%
+      summarise(
+        weighted_welfare = sum( welfChangeGroup * consumptionCa, na.rm = TRUE) / sum(consumptionCa, na.rm = TRUE),
+        .groups = "drop"
+      )%>%
+      rename(welfChange = weighted_welfare,
+             category = group)
+    
   }
   
   return(welfAgg)

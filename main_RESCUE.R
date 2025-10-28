@@ -104,6 +104,7 @@ all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring,
 
 data = prepare_modelData(all_paths,isExport = T) %>%
   filter(period %notin% c(1995,2000,2005,2010,2015,2020))
+  
 
 #instead of reading, load saved data for convenience
 load("RESCUE.RData")
@@ -178,8 +179,8 @@ p <- plot_output(outputPath = outputPath,
                  data3 = data, 
                  plotdataIneq = ineq,
                  exampleReg = 'IND',
-                 plotlist = c('ineqWorld'),
-                 micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
+                 plotlist = c('secBurdenByDecile'),
+                 micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){

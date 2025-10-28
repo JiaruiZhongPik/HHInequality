@@ -2,7 +2,7 @@
 
 plot_outputNCC <- function(){
 
-  theme_set(theme_minimal(base_family = "Arial", base_size = 7))
+
   
   nature_dims <- function(type = c("research_1col","research_2col"),
                           caption_words = 150) {
@@ -151,7 +151,7 @@ plot_outputNCC <- function(){
   nature_export_from_list <- function(x, stem, dir = ".",
                                       type = c("research_1col","research_2col","review_1col","review_2col","review_3col"),
                                       caption_words = 150, ncol = 2, custom_height_mm = NULL,
-                                      tag_levels = "a", panel_spacing_mm = 2,
+                                      tag_levels = "a", panel_spacing_mm = 20,
                                       tag_x = 0.05, tag_y = 1,
                                       tag_margin_r = 4,
                                       tag_size = 9,
@@ -190,24 +190,35 @@ plot_outputNCC <- function(){
   }
   
   
+ # Figures for the main text
+
+
   
-  # example for use
   figure1 <- plot_output(outputPath = outputPath, 
-                         data1  = decileWelfChange, 
+                         data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
-                         plotlist = c('welfByPeriod','ineqWorld'),
+                         plotlist = c('taxRevenueWorld','ineqWorldWithTransf_Gini'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
   
+  figure2 <- plot_output(outputPath = outputPath,
+                         data1  = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
+                         plotdataIneq = ineq,
+                         exampleReg = 'IND',
+                         plotlist = c('welfByPeriod','foodEneContribution'),
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
   
-  
-  
-  figure2 <- plot_output(outputPath = outputPath, 
-                         data1 = decileWelfChange, 
-                         data2 = decileConsShare, 
-                         data3 = data, 
+
+
+
+  figure3 <- plot_output(outputPath = outputPath,
+                         data1 = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
                          plotlist = c('ineqGlobalBetweenWithinTheilL','ineqGlobalWithinRegTheilL'),
@@ -215,34 +226,58 @@ plot_outputNCC <- function(){
   
   
   
-  figure3 <- plot_output(outputPath = outputPath, 
-                         data1 = decileWelfChange, 
-                         data2 = decileConsShare, 
-                         data3 = data, 
+  figure4 <- plot_output(outputPath = outputPath,
+                         data1 = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
                          plotlist = c('ineqTheilLRegBySecbyScen'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
-  figure4 <- plot_output(outputPath = outputPath, 
-                         data1 = decileWelfChange, 
-                         data2 = decileConsShare, 
-                         data3 = data, 
+  
+  figure5 <- plot_output(outputPath = outputPath,
+                         data1 = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
                          plotdataIneq = ineq,
                          exampleReg = 'IND',
                          plotlist = c('theilSectorDriver'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
+
+  figure6 <- plot_output(outputPath = outputPath,
+                         data1 = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
+                         plotdataIneq = ineq,
+                         exampleReg = 'IND',
+                         plotlist = c('secBurdenByDecile'),
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
-  figure5 <- plot_output(outputPath = outputPath, 
+  
+  #Figure for appendix
+  
+  
+  figure_a1 <- plot_output(outputPath = outputPath, 
                          data1 = decileWelfChange, 
                          data2 = decileConsShare, 
                          data3 = data, 
                          plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('taxRevenueWorld','ineqWorldWithTransf'),
+                         exampleReg = NA,
+                         plotlist = c('ineqWorldWithTransf_Theil'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
   
+  
+  
+  
+  
+  
   dir <- paste0(outputPath,'/ncc')
+  
+
+
+
+  #Export
   
   nature_export_from_list(
     figure1,
@@ -250,11 +285,10 @@ plot_outputNCC <- function(){
     stem = "Figure1",
     type = "research_2col",
     caption_words = 120,
-    ncol =1,
+    ncol = 1,
     collect_guides = F,
-    custom_height_mm = 120,
-    word_format = "png",
-    tag_x = 0.05,tag_y = 1.1
+    custom_height_mm = 140,
+    word_format = "png"     # or "emf"/"png"
   )
   
   nature_export_from_list(
@@ -262,14 +296,15 @@ plot_outputNCC <- function(){
     dir =   dir,
     stem = "Figure2",
     type = "research_2col",
-    caption_words = 140,
-    ncol = 1,
+    caption_words = 120,
+    ncol =1,
     collect_guides = F,
-    custom_height_mm = 120,
+    custom_height_mm = 140,
     word_format = "png",
-    tag_x = 0.05,tag_y = 1
+    tag_x = 0.05,tag_y = 1.1
   )
   
+
   nature_export_from_list(
     figure3,
     dir =   dir,
@@ -278,14 +313,31 @@ plot_outputNCC <- function(){
     caption_words = 120,
     ncol = 1,
     collect_guides = F,
-    custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
+    custom_height_mm = 140,
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1
   )
   
+
+
   nature_export_from_list(
     figure4,
     dir =   dir,
     stem = "Figure4",
+    type = "research_2col",
+    caption_words = 160,
+    ncol = 1,
+    collect_guides = F,
+    custom_height_mm = 160,
+    word_format = "png"     # or "emf"/"png"
+  )
+  
+  
+
+  nature_export_from_list(
+    figure5,
+    dir =   dir,
+    stem = "Figure5",
     type = "research_2col",
     caption_words = 120,
     ncol = 1,
@@ -293,6 +345,8 @@ plot_outputNCC <- function(){
     custom_height_mm = 160,
     word_format = "png"     # or "emf"/"png"
   )
+  
+  
   
   nature_export_from_list(
     figure5,
@@ -302,8 +356,22 @@ plot_outputNCC <- function(){
     caption_words = 120,
     ncol = 1,
     collect_guides = F,
-    custom_height_mm = 120,
+    custom_height_mm = 160,
     word_format = "png"     # or "emf"/"png"
+  )
+  
+  
+  nature_export_from_list(
+    figure6,
+    dir =   dir,
+    stem = "Figure6",
+    type = "research_2col",
+    caption_words = 120,
+    ncol = 1,
+    collect_guides = T,
+    custom_height_mm = 140,
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1
   )
   
 }
