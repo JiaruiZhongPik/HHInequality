@@ -1,7 +1,9 @@
 
 
-aggregate_decileWelfChange <- function( data1 = decileWelfChange, data2 = decileConsShare,
-                                        level = c("fullSec", "groupedSec", "totalSec", "totalWithTransfEpc", 
+aggregate_decileWelfChange <- function( data1 = decileWelfChange, 
+                                        data2 = decileConsShare,
+                                        level = c("fullSec", "groupedSec", 
+                                                  "totalSec", "totalWithTransfEpc", 
                                                   "totalWithTransfNeut"), 
                                         region = 'region') {
   

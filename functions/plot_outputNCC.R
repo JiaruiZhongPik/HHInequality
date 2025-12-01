@@ -254,6 +254,15 @@ plot_outputNCC <- function(){
                          plotlist = c('secBurdenByDecile'),
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
+  figure7 <- plot_output(outputPath = outputPath,
+                         data1 = decileWelfChange,
+                         data2 = decileConsShare,
+                         data3 = data,
+                         plotdataIneq = ineq,
+                         exampleReg = 'IND',
+                         plotlist = c('ineqRegGiniEpc'),
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
+  
   
   #Figure for appendix
   
@@ -372,6 +381,19 @@ plot_outputNCC <- function(){
     custom_height_mm = 140,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
+  )
+  
+  
+  nature_export_from_list(
+    figure7,
+    dir =   dir,
+    stem = "Figure7",
+    type = "research_2col",
+    caption_words = 160,
+    ncol = 1,
+    collect_guides = F,
+    custom_height_mm = 160,
+    word_format = "png"     # or "emf"/"png"
   )
   
 }

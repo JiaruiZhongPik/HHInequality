@@ -1,8 +1,10 @@
-# This function computes the inequality metrics for welfare change
+
+
 
 compute_inequalityMetrics <- function(data1 = decileWelfChange, 
                                       data2 = decileConsShare, data3 = data, 
                                       montecarlo = TRUE, n_perms = 300){
+  
   
   result <- list()
   
@@ -28,239 +30,236 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     ) %>%
     select(-starts_with("share|")) %>%
     rename( remind_base = scenario)
-    
+  
   consBase <- data2 %>%
     select(-starts_with("share|"), -consumptionCa) %>%
     filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%
     left_join( mapping, by= c('scenario'= 'remind_run')) %>%
     merge(consBase, by = c("region", "period", "decileGroup", "remind_base")) %>%
     select(-remind_base)
-
-  
-
-  #--------Compute the post inequality metrics (all channels included With neutral tranfer)-----------
-  #get the total log points change
-  welfByDecile <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                             data2 = decileConsShare, level = c("totalWithTransfNeut"), 
-                                             region = 'decile')
   
   pop <- data3 %>%filter(variable == 'Population') %>% select(-unit,-variable,-baseline, -model) %>%
     rename(population = value)
   
-
-  #Compute the prior and post inequality metrics over all categories
-  dfIneq <- consBase %>%
-    merge( welfByDecile, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa *  exp(welfChange/100) ) %>%
+  
+  #-------Compute the reference inequality --------------------------------------------
+  #baseline inequality
+  
+  ineqRegRef <- consBase %>%
+    filter(scenario =='C_SSP2-hiOS-def') %>% # consBase contains the baseline consumption for policy scenario
+    mutate(scenario = "C_SSP2-NPi2025") %>%
     group_by(scenario, region, period) %>%
     summarise(
       `ineq|Gini` = Gini(consumptionCa),
       `ineq|TheilT` = compute_theil.wtd(consumptionCa, type = 'T'),
       `ineq|TheilL` = compute_theil.wtd(consumptionCa, type = 'L'),
-      `ineq|GiniPost` = Gini(consumptionCaPost),
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      
       .groups = "drop"
-    ) %>%
-    mutate (category = 'TotalWithTransfNeut')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value")
+    ) %>% mutate (category = 'Reference')
   
   
-  #Compute the world inequality metrics
-  dfIneq <- consBase %>%
-    merge( welfByDecile, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
+  #Reference 
+  ineqGlobalRef<- consBase %>%
+    filter(scenario =='C_SSP2-hiOS-def') %>% # consBase contains the baseline consumption for policy scenario
+    mutate(scenario = "C_SSP2-NPi2025") %>%
     merge(pop, by = c('scenario','region','period')) %>%
-    mutate(population = population/10) %>%
+    mutate(population = population/10) %>% 
     group_by(scenario, period) %>%
     summarise(
       `ineq|Gini` = weighted.gini(consumptionCa, population)[['Gini']],
       `ineq|TheilT` = compute_theil.wtd(consumptionCa, population,type = 'T'),
       `ineq|TheilL` = compute_theil.wtd(consumptionCa, population,type = 'L'),
-      `ineq|GiniPost` = weighted.gini(consumptionCaPost, population)[['Gini']],
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
+      .groups = "drop"
+    ) %>% 
+    mutate (category = 'Reference',
+            region = 'World')
+  
+  #-----------------------------------End----------------------------------------
+  
+  #--------Compute the post inequality metrics (all channels included With neutral tranfer)-----------
+  #get the total log points change
+  welfByDecileTransfNeut <- aggregate_decileWelfChange(data1 = decileWelfChange, 
+                                                       data2 = decileConsShare, level = c("totalWithTransfNeut"), 
+                                                       region = 'decile')
+  
+  
+  
+  
+  #Compute inequality in policy scenario, total with Neut transfer
+  ineqRegPolAllNeut <- consBase %>%
+    merge( welfByDecileTransfNeut, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    mutate(consumptionCaPost = consumptionCa *  exp(welfChange/100) ) %>%
+    group_by(scenario, region, period) %>%
+    summarise(
+      `ineq|Gini` = Gini(consumptionCaPost),
+      `ineq|TheilT` = compute_theil.wtd(consumptionCaPost, type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
+      .groups = "drop"
+    ) %>%
+    mutate (category = 'TotalWithTransfNeut')
+  
+  
+  
+  #Compute the inequality metric for world (use pop weights)
+  
+  
+  #policy
+  ineqGlobalPolAllNeut <- consBase %>%
+    merge( welfByDecileTransfNeut, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
+    merge(pop, by = c('scenario','region','period')) %>%
+    mutate(population = population/10) %>%
+    group_by(scenario, period) %>%
+    summarise(
+      `ineq|Gini` = weighted.gini(consumptionCaPost, population)[['Gini']],
+      `ineq|TheilT` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
       .groups = "drop"
     ) %>%
     mutate (category = 'TotalWithTransfNeut',
-            region = 'World')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
-  
-  
+            region = 'World')
+  #-----------------------------------End----------------------------------------------
   
   
   #--------Compute the post inequality metrics (all channels included and Epc Transfer)-----------
   
-  # Epc transfer
   welfByDecileTransfEpc <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                                   data2 = decileConsShare, 
-                                                   level = c("totalWithTransfEpc"), 
-                                                   region = 'decile')
+                                                      data2 = decileConsShare, 
+                                                      level = c("totalWithTransfEpc"), 
+                                                      region = 'decile')
   
-  #Compute the prior and post inequality metrics over all categories for each region
-  dfIneq <- consBase %>%
-    merge(   welfByDecileTransfEpc, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
+  ineqRegPolAllEpc <- consBase %>%
+    merge( welfByDecileTransfEpc, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
+    mutate(consumptionCaPost = consumptionCa *  exp(welfChange/100) ) %>%
     group_by(scenario, region, period) %>%
     summarise(
-      `ineq|Gini` = Gini(consumptionCa),
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, type = 'L'),
-      `ineq|GiniPost` = Gini(consumptionCaPost),
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      
+      `ineq|Gini` = Gini(consumptionCaPost),
+      `ineq|TheilT` = compute_theil.wtd(consumptionCaPost, type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCaPost,  type = 'L'),
       .groups = "drop"
     ) %>%
-    mutate (category = 'TotalWithTransfEpc')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
+    mutate (category = 'TotalWithTransfEpc')
   
   
-  #For world
-  dfIneq <- consBase %>%
+  #policy
+  ineqGlobalPolAllEpc <- consBase %>%
     merge( welfByDecileTransfEpc, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
     mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c('scenario','region','period')) %>%
     mutate(population = population/10) %>%
     group_by(scenario, period) %>%
     summarise(
-      `ineq|Gini` = weighted.gini(consumptionCa, population)[['Gini']],
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, population,type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, population,type = 'L'),
-      `ineq|GiniPost` = weighted.gini(consumptionCaPost, population)[['Gini']],
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
+      `ineq|Gini` = weighted.gini(consumptionCaPost, population)[['Gini']],
+      `ineq|TheilT` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
+      `ineq|TheilL` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
       .groups = "drop"
     ) %>%
     mutate (category = 'TotalWithTransfEpc',
-            region = 'World')%>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
+            region = 'World')
+  
+  #-----------------------------------End----------------------------------------
   
   
+  #--------Compute categorical impacts for regions-------------------------------
   
+  # welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, 
+  #                                               data2 = decileConsShare, 
+  #                                               level = c("fullSec"), 
+  #                                               region = 'decile')
   
-  #-----------Compute post inequality metrics for categorical impacts-----------
-  welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                                data2 = decileConsShare, 
-                                                level = c("fullSec"), 
-                                                region = 'decile')
-  
-  
-  dfIneq <- consBase %>%
-    merge( welfByDecileSec, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
-    group_by(scenario, region, period, category) %>%
-    summarise(
-      `ineq|Gini` = Gini(consumptionCa),
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, type = 'L'),
-      `ineq|GiniPost` = Gini(consumptionCaPost),
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      .groups = "drop"
-    ) %>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
-  
-  dfIneq <-  consBase %>%
-    merge( welfByDecileSec, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
-    merge(pop, by = c('scenario','region','period')) %>%
-    mutate(population = population/10) %>%
-    group_by(scenario, period, category) %>%
-    summarise(
-      `ineq|Gini` = Gini(consumptionCa),
-      `ineq|TheilT` = compute_theil.wtd(consumptionCa, population, type = 'T'),
-      `ineq|TheilL` = compute_theil.wtd(consumptionCa, population, type = 'L'),
-      `ineq|GiniPost` = Gini(consumptionCaPost),
-      `ineq|TheilTPost` = compute_theil.wtd(consumptionCaPost, population, type = 'T'),
-      `ineq|TheilLPost` = compute_theil.wtd(consumptionCaPost, population, type = 'L'),
-      `ineq|deltGini` = `ineq|GiniPost` - `ineq|Gini`,
-      `ineq|deltTheilT` = `ineq|TheilTPost` - `ineq|TheilT`,
-      `ineq|deltTheilL` = `ineq|TheilLPost` - `ineq|TheilL`,
-      .groups = "drop"
-    ) %>%
-    mutate(region = 'World') %>%
-    pivot_longer(cols = starts_with("ineq|"), names_to = "variable", values_to = "value") %>%
-    bind_rows(dfIneq)
-
-  
-  
-  #Shapley docomposition 
   #Step1:channel-wise shock
-  dfShock <- consBase %>%
-    merge( data1 %>% filter(!str_starts(category, "Consumption")), by = c('scenario', 'region', 'period', 'decileGroup')) %>%
-    mutate(shock = consumptionCa * (exp(decilWelfChange/100)-1) ) %>%
-    select( -consumptionCa, -decilWelfChange ) 
-
-  df <- dfShock %>%
-    left_join(consBase, by = c("scenario", "region", "period", "decileGroup"))
+  df <- consBase %>%
+    merge(
+      data1 %>% filter(!str_starts(category, "Consumption")),
+      by = c("scenario", "region", "period", "decileGroup"),
+      suffixes = c("", "_welf")
+    ) %>%
+    group_by(scenario, region, period, decileGroup) %>%
+    mutate(
+      # Baseline total consumption (same for all categories in this group)
+      C0 = consumptionCa,
+      
+      # Log contributions per category (in decimal, not percent)
+      d_k = decilWelfChange / 100,
+      
+      # Relative “raw” contribution from each log shock
+      r_k = exp(d_k) - 1,
+      r_sum = sum(r_k, na.rm = TRUE),
+      
+      # Total log change and total level change
+      d_tot     = sum(d_k, na.rm = TRUE),
+      delta_Ctot = C0 * (exp(d_tot) - 1),
+      
+      # Weights for allocating total level change
+      w_k = ifelse(r_sum == 0, 1 / n(), r_k / r_sum),
+      
+      # Final sector shock in levels that *sum exactly* to total change
+      shock = delta_Ctot * w_k
+    ) %>%
+    ungroup() %>%
+    select(
+      scenario, region, period, decileGroup,
+      category,
+      consumptionCa,  # baseline total
+      shock           # sector-wise ΔC_k
+      # drop decilWelfChange unless you still need it
+    )
   
   
-  # Step 2: Shapley with zero-income exclusion
-  compute_shapley<- function(df_group,
-                             theil_type = "L",
-                             montecarlo = TRUE,
-                             n_perms = 300) {
-    # 1) Prep
-    stopifnot(all(c("category","consumptionCa","shock") %in% names(df_group)))
+  #helper function for monte carlo simulaiton of sharpley value
+  compute_shapley <- function(df_group,
+                              index      = c("Theil", "Gini"),
+                              theil_type = "L",
+                              montecarlo = TRUE,
+                              n_perms    = 300) {
+    stopifnot(all(c("category", "consumptionCa", "shock") %in% names(df_group)))
+    
+    index <- match.arg(index)
     all_cats <- sort(unique(df_group$category))
-    base <- df_group[df_group$category=='Staples',]$consumptionCa
     
+    # Baseline: total consumption (once per decile),
+    # taken from "Staples" rows as a dedup trick
+    base <- df_group$consumptionCa[df_group$category == "Staples"]
     
-    # 2) shocks list aligned by category
+    # Shocks per category, ordered consistently by decileGroup
     shocks <- lapply(all_cats, function(ct) df_group$shock[df_group$category == ct])
     names(shocks) <- all_cats
     
-    # 3) permutations
+    # Mask zero baseline
+    mask_once <- base > 0
+    base      <- base[mask_once]
+    shocks    <- lapply(shocks, function(x) x[mask_once])
+    
+    # Inequality function
+    ineq_fun <- switch(
+      index,
+      "Theil" = function(x) compute_theil.wtd(x, type = theil_type),
+      "Gini"  = function(x) Gini(x)
+    )
+    
+    # Permutations
     if (montecarlo) {
       perms_list <- replicate(n_perms, sample(all_cats), simplify = FALSE)
     } else {
-      # requires gtools
-      perms_matrix <- gtools::permutations(n = length(all_cats), r = length(all_cats), v = all_cats)
+      perms_matrix <- gtools::permutations(
+        n = length(all_cats),
+        r = length(all_cats),
+        v = all_cats
+      )
       perms_list <- lapply(seq_len(nrow(perms_matrix)), function(r) perms_matrix[r, ])
     }
     
-    # 4) zero-income exclusion mask (apply at each step or once; here we do once based on baseline)
-    mask_once <- base > 0
-    # If you want stepwise exclusion, move masking inside the j-loop after updating `curr`.
-    
-    # 5) iterate permutations and accumulate marginals
+    # Shapley loop
     marginal_matrix <- matrix(0, nrow = length(perms_list), ncol = length(all_cats))
     colnames(marginal_matrix) <- all_cats
     
     for (i in seq_along(perms_list)) {
-      ord <- perms_list[[i]]
-      curr <- base
-      T_prev <- compute_theil.wtd(curr,type = theil_type)
+      ord   <- perms_list[[i]]
+      curr  <- base
+      T_prev <- ineq_fun(curr)
       
-      for (j in seq_along(ord)) {
-        ct <- ord[j]
-        curr <- curr + shocks[[ct]]
-        
-        # optional: enforce non-negativity to avoid pathological Theil values
-        # curr <- pmax(curr, 0)
-        
-        T_curr <- compute_theil.wtd(curr,type = theil_type)
+      for (ct in ord) {
+        curr   <- curr + shocks[[ct]]
+        T_curr <- ineq_fun(curr)
         marginal_matrix[i, ct] <- T_curr - T_prev
         T_prev <- T_curr
       }
@@ -268,115 +267,50 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     
     shapley_values <- colMeans(marginal_matrix, na.rm = TRUE)
     tibble::tibble(category = names(shapley_values), shapley = shapley_values)
-  }  
+  }
   
-  
-  # Use Monte Carlo, n_perms = 300 already gives good approximation
-  shapleyL <- df %>%
+  #compute shapley 
+  shapleyTheilL <- df %>%
     group_by(scenario, region, period) %>%
-    group_modify(~ compute_shapley(.x, theil_type = 'L', montecarlo = montecarlo, n_perms = n_perms)) %>%
+    group_modify(~ compute_shapley(.x, index = 'Theil', theil_type = 'L', 
+                                   montecarlo = montecarlo, n_perms = n_perms)) %>%
     ungroup() %>%
-    mutate(variable = "ineq|TheilShapley") %>%
+    mutate(variable = "ineq|shapleyTheilL") %>%
     rename( value = shapley )
   
-  shapleyT <- df %>%
+  shapleyTheilT <- df %>%
     group_by(scenario, region, period) %>%
-    group_modify(~ compute_shapley(.x, theil_type = 'T', montecarlo = montecarlo, n_perms = n_perms)) %>%
+    group_modify(~ compute_shapley(.x, index = 'Theil', theil_type = 'T', 
+                                   montecarlo = montecarlo, n_perms = n_perms)) %>%
     ungroup() %>%
-    mutate(variable = "ineq|TheilShapley") %>%
+    mutate(variable = "ineq|shapleyTheilT") %>%
     rename( value = shapley )
   
-  # Compute the relative shapley contribution
-  shapleyRelaL <-   shapleyL %>%
+  shapleyGini <- df %>%
     group_by(scenario, region, period) %>%
-    mutate(shapleyRela = abs(value) / sum(abs(value), na.rm = TRUE)) %>%
+    group_modify(~ compute_shapley(.x, index = 'Gini', 
+                                   montecarlo = montecarlo, n_perms = n_perms)) %>%
     ungroup() %>%
-    select(-value, -variable) %>%
-    mutate(shapleyRela = ifelse(is.nan(shapleyRela), 0, shapleyRela))
+    mutate(variable = "ineq|shapleyGini") %>%
+    rename( value = shapley )
   
-  shapleyRelaT <-   shapleyT %>%
-    group_by(scenario, region, period) %>%
-    mutate(shapleyRela = abs(value) / sum(abs(value), na.rm = TRUE)) %>%
-    ungroup() %>%
-    select(-value, -variable) %>%
-    mutate(shapleyRela = ifelse(is.nan(shapleyRela), 0, shapleyRela))
-
-  # Use full permutation
-  # shapley_full <- df %>%
-  #   filter(period == 2050) %>%
-  #   group_by(scenario, region, period) %>%
-  #   group_modify(~ compute_shapley_zero_flexible(.x, montecarlo = FALSE)) %>%
-  #   ungroup() %>%
-  #   rename( shapleyFull = shapley)
+  #-----------------------------------End-----------------------------------------
   
-  #Compute for whole world
-  # Use Monte Carlo, n_perms = 300 already gives good approximation
-  shapleyWorldL <- df %>%
-    group_by(scenario, period) %>%
-    group_modify(~ compute_shapley(.x,theil_type = 'L', montecarlo = montecarlo, n_perms = n_perms)) %>%
-    ungroup() %>%
-    mutate(variable = "ineq|TheilShapley",
-           region = 'World') %>%
-    rename( value = shapley ) 
   
-  shapleyWorldT <- df %>%
-    group_by(scenario, period) %>%
-    group_modify(~ compute_shapley(.x,theil_type = 'T', montecarlo = montecarlo, n_perms = n_perms)) %>%
-    ungroup() %>%
-    mutate(variable = "ineq|TheilShapley",
-           region = 'World') %>%
-    rename( value = shapley ) 
+  result[['ineq']] <- bind_rows(ineqRegRef, ineqGlobalRef,
+                                ineqRegPolAllNeut, ineqGlobalPolAllNeut,
+                                ineqRegPolAllEpc, ineqGlobalPolAllEpc) %>%
+    pivot_longer(
+      cols = starts_with("ineq|"),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+    bind_rows(shapleyTheilT, shapleyTheilL, shapleyGini)
   
-  # Compute the relative shapley value
-  shapleyWorldRelaL <-   shapleyWorldL %>%
-    group_by(scenario, region, period) %>%
-    mutate(shapleyRela = abs(value) / sum(abs(value), na.rm = TRUE)) %>%
-    ungroup() %>%
-    select(-value, -variable) %>%
-    mutate(shapleyRela = ifelse(is.nan(shapleyRela), 0, shapleyRela))
   
-  shapleyWorldRelaT <-   shapleyWorldT %>%
-    group_by(scenario, region, period) %>%
-    mutate(shapleyRela = abs(value) / sum(abs(value), na.rm = TRUE)) %>%
-    ungroup() %>%
-    select(-value, -variable) %>%
-    mutate(shapleyRela = ifelse(is.nan(shapleyRela), 0, shapleyRela))
-  
-  shapleyRelaL <- shapleyWorldRelaL %>%
-    bind_rows(shapleyRelaL)
-  
-  shapleyRelaT <- shapleyWorldRelaT %>%
-    bind_rows(shapleyRelaT)
-  
-
-  dfIneq <- dfIneq %>%
-    filter (category =='TotalWithTransfNeut',variable =='ineq|deltTheilT') %>%
-    select(-variable, -category) %>%
-    rename(deltTheil = value) %>%
-    merge(shapleyRelaT, by = c('scenario','region','period')) %>%
-    group_by(scenario,region,period) %>%
-    mutate(deltTheilShapley = deltTheil * shapleyRela)%>%
-    select( - deltTheil, -shapleyRela) %>%
-    mutate(variable = 'ineq|deltTheilTShapley') %>%
-    rename(value = deltTheilShapley) %>%
-    bind_rows(dfIneq)
-  
-  result[['ineq']] <- dfIneq %>%
-    filter (category =='TotalWithTransfNeut',variable =='ineq|deltTheilL') %>%
-    select(-variable, -category) %>%
-    rename(deltTheil = value) %>%
-    merge(shapleyRelaL, by = c('scenario','region','period')) %>%
-    group_by(scenario,region,period) %>%
-    mutate(deltTheilShapley = deltTheil * shapleyRela)%>%
-    select( - deltTheil, -shapleyRela) %>%
-    mutate(variable = 'ineq|deltTheilLShapley') %>%
-    rename(value = deltTheilShapley) %>%
-    bind_rows(dfIneq) 
-  
-
-    
-  result[['theilTDecomp']] <- consBase %>%
-    merge(welfByDecile, by = c("scenario", "region", "period", "decileGroup")) %>%
+  # Decomposation of between- and within-region inequality
+  result[['theilTDecompEpc']] <- consBase %>%
+    merge(welfByDecileTransfEpc, by = c("scenario", "region", "period", "decileGroup")) %>%
     mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c("scenario", "region", "period")) %>%
     mutate(population = population / 10) %>%
@@ -398,8 +332,8 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
       df <- cbind(df, theil_result, theil_result_base)
     })
   
-  result[['theilLDecomp']] <- consBase %>%
-    merge(welfByDecile, by = c("scenario", "region", "period", "decileGroup")) %>%
+  result[['theilLDecompEpc']] <- consBase %>%
+    merge(welfByDecileTransfEpc, by = c("scenario", "region", "period", "decileGroup")) %>%
     mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
     merge(pop, by = c("scenario", "region", "period")) %>%
     mutate(population = population / 10) %>%
@@ -422,10 +356,62 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
     })
   
   
+  
+  result[['theilTDecompNeut']] <- consBase %>%
+    merge(welfByDecileTransfNeut, by = c("scenario", "region", "period", "decileGroup")) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
+    merge(pop, by = c("scenario", "region", "period")) %>%
+    mutate(population = population / 10) %>%
+    group_by(scenario, period) %>%
+    group_modify(~{
+      df <- .x
+      
+      theil_result <- as.data.frame(iTheilT(df$consumptionCaPost, 
+                                            as.integer(as.factor(df$region)), 
+                                            w = df$population))
+      
+      theil_result_base <- as.data.frame(iTheilT(df$consumptionCa, 
+                                                 as.integer(as.factor(df$region)), 
+                                                 w = df$population))
+      
+      # Rename base columns to avoid conflicts
+      names(theil_result_base) <- paste0(names(theil_result_base), "|base")
+      
+      df <- cbind(df, theil_result, theil_result_base)
+    })
+  
+  
+  result[['theilLDecompNeut']] <- consBase %>%
+    merge(welfByDecileTransfNeut, by = c("scenario", "region", "period", "decileGroup")) %>%
+    mutate(consumptionCaPost = consumptionCa * exp(welfChange/100)) %>%
+    merge(pop, by = c("scenario", "region", "period")) %>%
+    mutate(population = population / 10) %>%
+    group_by(scenario, period) %>%
+    group_modify(~{
+      df <- .x
+      
+      theil_result <- as.data.frame(iTheilL(df$consumptionCaPost, 
+                                            as.integer(as.factor(df$region)), 
+                                            w = df$population))
+      
+      theil_result_base <- as.data.frame(iTheilL(df$consumptionCa, 
+                                                 as.integer(as.factor(df$region)), 
+                                                 w = df$population))
+      
+      # Rename base columns to avoid conflicts
+      names(theil_result_base) <- paste0(names(theil_result_base), "|base")
+      
+      df <- cbind(df, theil_result, theil_result_base)
+    })
+  
+  
+  
+  
+  
   return(result)
+  
+  
+  
   
 }
 
-
-
- 

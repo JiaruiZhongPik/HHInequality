@@ -232,8 +232,7 @@ plot_inspection <- function( outputPath,
         mutate(variable = 'Carbon price')
       
 
-        
-        p[[paste0('carbonPrice', scen)]] <- list(
+        p[[paste0('carbonPrice')]] <- list(
           plot = ggplot(plotdf, 
                         aes(x = period, y = value, color = scenario)) +
             geom_line(linewidth = 1) +
@@ -258,6 +257,9 @@ plot_inspection <- function( outputPath,
           height = 8
           
         )
+        
+
+
         
       }
       

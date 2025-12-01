@@ -338,37 +338,9 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
  #     arrange(scenario, region, period, decileGroup)
       
  #Approach 3:
- source('functions/compute_transferEpc.R')
- transferEpc <- compute_transferEpc(data1 = data1)
-  
-  weight <- decileConsShare %>%
-    filter(scenario == 'C_SSP2-NPi2025') %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>%
-    mutate(
-      total = sum(consumptionCa, na.rm = TRUE),
-      consShare = if_else(total > 0, consumptionCa / total, NA_real_),
-      .by = c(scenario, region, period)
-    ) %>%
-    select(-total, -consumptionCa,-scenario) %>%
-    tidyr::crossing(scenario = paste0( 'C_',all_runscens,'-',all_budgets ))
-  
-  transferNeut <- data1 %>%
-    filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
-           scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
-           region != 'World') %>%
-    select(-model, -baseline) %>%
-    calc_addVariable(
-      "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
-      "`TaxesCa|GHG`" = "`Taxes|GHG` * 1e3 / `Population`" ,
-      units = c('billion US$2017/yr','US$2017/ca/yr')
-    ) %>%
-    filter(variable == "TaxesCa|GHG") %>%
-    select(-variable, -unit) %>%
-    crossing(decileGroup = 1:10) %>%
-    arrange(scenario, region, period, decileGroup) %>%
-    left_join(weight, by = c('scenario', 'region','period','decileGroup')) %>%
-    mutate(transferNeut = value * consShare * 10) %>%
-    select(-value, -consShare)
+ source('functions/compute_transfer.R')
+ transferEpc <- compute_transfer(data1 = data1, data2 = data2, recycle ='epc')
+ transferNeut <- compute_transfer(data1 = data1, data2 = data2, recycle ='neut')
   
   decileWelfChange <- decileConsShare %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>% 

@@ -65,6 +65,20 @@ prepare_modelData <- function (all_paths,isDisplay = F, isExport = F){
       scenario= str_remove(scenario, "-(rem|mag)-\\d+$")
     ) 
   
+  
+  data <- data %>%
+  calc_addVariable("FEShare|Household" = "(`FE|Buildings|Gases` * `Price|Buildings|Gases` +
+                   `FE|Buildings|Electricity` * `Price|Buildings|Electricity`+
+                   `FE|Buildings|Other fuels` * `Price|Buildings|Other fuels`+
+                   `FE|++|Transport` * `Price|Transport|FE`) /
+                   `Consumption`",
+                               "share|Building gases" = "`FE|Buildings|Gases` * `Price|Buildings|Gases`/ `Consumption`",
+                               "share|Building electricity" = "`FE|Buildings|Electricity` * `Price|Buildings|Electricity`/`Consumption`",
+                               "share|Building other fuels" = "`FE|Buildings|Other fuels` * `Price|Buildings|Other fuels`/`Consumption`",
+                               "share|Transport energy" = "`FE|++|Transport` * `Price|Transport|FE`/ `Consumption`"
+  )
+  
+  
   #For RESCUE scenarios, the budegt runs are renamed to include underlying SSPs
   
   if (any(grepl("loOS-def|hiOS-def", all_budgets, fixed = FALSE))) {

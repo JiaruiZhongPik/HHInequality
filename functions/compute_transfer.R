@@ -1,5 +1,5 @@
 
-compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "neut"){
+compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "neut", revenue = 0){
   
   ir2130 <- data1 %>%
     filter(variable == "Interest Rate (t+1)/(t-1)|Real",
@@ -164,9 +164,13 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
 
   }
   
-
+  if(revenue ==1){
+    return(revenue_smoothed)
+  }else if(revenue!=1){
+    return(transfer)
+  }
   
-  return(transfer)
+
 }
 
 

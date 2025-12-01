@@ -2,9 +2,9 @@
 # with internal estimates
 # Jiarui Zhong
 
-get_estimateMcc <- function(regionGrouping = 'H12'){
+get_estimateMcc <- function(regressRegGrouping = 'H12'){
  
-   if(regionGrouping == 'H12'){
+   if(regressRegGrouping == 'H12'){
     
      region <- read_delim("input/regionmappingH12.csv", 
                          delim = ";", escape_double = FALSE, col_types = cols(X = col_skip()), 
@@ -15,7 +15,7 @@ get_estimateMcc <- function(regionGrouping = 'H12'){
        pull(RegionCode)
    
      
-     coef_mcc <- read_excel("input/Engel_Curve_12Regions.xlsx") %>%
+     coef_mcc <- read_excel("input/Engel_Curve_12Regions_Deciles.xlsx") %>%
        rename(region = Region,
               value = estimate,
               regressor = term,
@@ -39,10 +39,10 @@ get_estimateMcc <- function(regionGrouping = 'H12'){
          )
         ) 
      
-     print('JPN data missing and CHN estimate invalid, they are 
+     print('JPN/CHA data missing and CHN estimate invalid, they are 
            replaced with GCD global estiamtes')
      
-     coef_gcd <- analyze_regression(regression_model = regression_model, ConsData = ConsData, regionGrouping = 'pool',
+     coef_gcd <- analyze_regression(regressModel = regressModel, consData = 'gcd', regressRegGrouping = 'pool',
                                     isDisplay = TRUE, isExport = T) %>%
        mutate(label = 'gcd')
       
@@ -52,10 +52,10 @@ get_estimateMcc <- function(regionGrouping = 'H12'){
        bind_rows(coef_mcc %>% filter(region != 'CHA') )
      
     
-    }else if(regionGrouping == 'H21') {
+    }else if(regressRegGrouping == 'H21') {
     
     region <- 
-     read_delim("input/regionmapping_21_EU11.csv", 
+     read_delim("input/Engel_Curve_12Regions_Deciles.csv", 
                 delim = ";", escape_double = FALSE, col_types = cols(X = col_skip(), 
                                                                      missingH12 = col_skip()), 
                 trim_ws = TRUE,
@@ -66,7 +66,7 @@ get_estimateMcc <- function(regionGrouping = 'H12'){
     
     print('input not available yet and using regional-specific Engel curve is abandoned as being unrealiable for future projection')
     
-    } else if(regionGrouping == 'pool'){
+    } else if(regressRegGrouping == 'pool'){
     
 
       coef <- read_excel("input/Engel_Curve_Joint_Estimation_Alternative.xlsx") %>%

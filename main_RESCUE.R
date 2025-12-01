@@ -63,6 +63,7 @@ library(dineq)
 library(acid)
 library(iIneq)
 library(paletteer)
+library(grid)
 options(dplyr.summarise.inform = FALSE,
         scipen = 999)
 
@@ -80,10 +81,10 @@ reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"
 all_budgets <- c("loOS-def","hiOS-def")
 REMIND_pattern <- "REMIND_generic*.mif"
 
-#Modelling setting
-regions <- 'H12'                            # options are H12 or H21 
-regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
-regionGrouping <- 'pool'                    # options are: "H12", "H21", "country", "pool"
+#Model setting
+regions <- 'H12'                            # options are H12 or H21, seemingly redundant
+regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
+regressRegGrouping <- 'pool'                # options are: "H12", "H21", "country", "pool"
 consData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
@@ -91,7 +92,7 @@ micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of ye
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','_prone_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -103,7 +104,7 @@ all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring,
 #Starting year moved to 2025, as GHG revenues from REMIND is positive before that 
 
 data = prepare_modelData(all_paths,isExport = T) %>%
-  filter(period %notin% c(1995,2000,2005,2010,2015,2020))
+  filter(period >= 2025)
   
 
 #instead of reading, load saved data for convenience
@@ -111,12 +112,17 @@ load("RESCUE.RData")
 
 
 if(consData == 'gcd'){
-  coef = analyze_regression(regression_model = regression_model, 
-                            consData = consData, regionGrouping = regionGrouping,
+  
+  coef = analyze_regression(regressModel = regressModel, 
+                            consData = consData, 
+                            regressRegGrouping = regressRegGrouping,
+                            prune = T,
                             isDisplay = TRUE, isExport = T)
+  
+  #Write a fill function, t integrate the filling procedure here
 } else if(consData == 'mcc') {
   
-  coef = get_estimateMcc(regionGrouping = regionGrouping)
+  coef = get_estimateMcc(regressRegGrouping = regressRegGrouping)
   
 }
 
@@ -128,7 +134,7 @@ if(consData == 'gcd'){
 #   missing = c('CAZ', 'JPN', 'USA'),
 #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, 
+decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regressModel, 
                                            isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 
 
@@ -179,7 +185,7 @@ p <- plot_output(outputPath = outputPath,
                  data3 = data, 
                  plotdataIneq = ineq,
                  exampleReg = 'IND',
-                 plotlist = c('secBurdenByDecile'),
+                 plotlist = c('regionIneqChangeBar_Gini'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
