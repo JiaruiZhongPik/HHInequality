@@ -46,7 +46,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   #baseline inequality
   
   ineqRegRef <- consBase %>%
-    filter(scenario =='C_SSP2-hiOS-def') %>% # consBase contains the baseline consumption for policy scenario
+    filter(scenario == paste0( 'C_',all_runscens,'-',all_budgets)[1]) %>% # consBase contains the baseline consumption for policy scenario
     mutate(scenario = "C_SSP2-NPi2025") %>%
     group_by(scenario, region, period) %>%
     summarise(
@@ -59,7 +59,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   #Reference 
   ineqGlobalRef<- consBase %>%
-    filter(scenario =='C_SSP2-hiOS-def') %>% # consBase contains the baseline consumption for policy scenario
+    filter(scenario == paste0( 'C_',all_runscens,'-',all_budgets)[1]) %>% # consBase contains the baseline consumption for policy scenario
     mutate(scenario = "C_SSP2-NPi2025") %>%
     merge(pop, by = c('scenario','region','period')) %>%
     mutate(population = population/10) %>% 

@@ -63,27 +63,27 @@ library(dineq)
 library(acid)
 library(iIneq)
 library(paletteer)
+library(grid)
 options(dplyr.summarise.inform = FALSE,
         scipen = 999)
-
 
 
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
-#rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
-#rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
-rootdir_remind <- "/p/tmp/jiaruizh/RemindMagpie/remind/output"
-rootdir_magpie <- "/p/tmp/jiaruizh/RemindMagpie/remind/magpie/output"
+rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
+rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
+#rootdir_remind <- "/p/tmp/jiaruizh/RemindMagpie/remind/output"
+#rootdir_magpie <- "/p/tmp/jiaruizh/RemindMagpie/remind/magpie/output"
 all_runscens <- c("SSP2")
 reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"     
 all_budgets <- c("PkBudg1000","PkBudg650")
 REMIND_pattern <- "REMIND_generic*.mif"
 
-#Modelling setting
-regions <- 'H12'                            # options are H12 or H21 
-regression_model<-"logitTransOLS"           # other available options are  "logitTransOLS", 'PolynomialLM'
-regionGrouping <- 'pool'                    # options are: "H12", "H21", "country", "pool"
+#Model setting
+regions <- 'H12'                            # options are H12 or H21, seemingly redundant
+regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
+regressRegGrouping <- 'pool'                # options are: "H12", "H21", "country", "pool"
 consData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
@@ -91,7 +91,7 @@ micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of ye
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'_NPi2025_neutralDistribution_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_PKBudg_',consData,'_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -102,19 +102,24 @@ all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring,
 #Starting year moved to 2025, as GHG revenues from REMIND is positive before that 
 
 data = prepare_modelData(all_paths,isExport = T) %>%
-  filter(period %notin% c(1995,2000,2005,2010,2015,2020))
+  filter(period >= 2025)
 
 #instead of reading, load saved data for convenience
 load("RemindMagpie_250424.RData")
 
 
 if(consData == 'gcd'){
-  coef = analyze_regression(regression_model = regression_model, 
-                            consData = consData, regionGrouping = regionGrouping,
+  
+  coef = analyze_regression(regressModel = regressModel, 
+                            consData = consData, 
+                            regressRegGrouping = regressRegGrouping,
+                            prune = T,
                             isDisplay = TRUE, isExport = T)
+  
+  #Write a fill function, t integrate the filling procedure here
 } else if(consData == 'mcc') {
   
-  coef = get_estimateMcc(regionGrouping = regionGrouping)
+  coef = get_estimateMcc(regressRegGrouping = regressRegGrouping)
   
 }
 
@@ -126,7 +131,7 @@ if(consData == 'gcd'){
  #   missing = c('CAZ', 'JPN', 'USA'),
  #   replaceWith = c('EUR', 'EUR', 'EUR'))
 
-decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regression_model, 
+decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regressModel, 
                                            isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 
 
@@ -147,9 +152,9 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model,
 
 #To do needs debug for Neutral transfer
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
-                                 data2 = decileConsShare, 
-                                 data3 = data,
-                                 montecarlo = TRUE, n_perms = 300)
+                                  data2 = decileConsShare, 
+                                  data3 = data,
+                                  montecarlo = TRUE, n_perms = 300)
 
 
 #validate the theil combiled in total and decomposed
@@ -170,6 +175,7 @@ plot_output(outputPath = outputPath,
 plot_outputNCC()
 
 
+
 #any individual plot
 p <- plot_output(outputPath = outputPath, 
             data1  = decileWelfChange, 
@@ -177,7 +183,7 @@ p <- plot_output(outputPath = outputPath,
             data3 = data, 
             plotdataIneq = ineq,
             exampleReg = 'IND',
-            plotlist = c('ineqWorld'),
+            plotlist = c('regionIneqChangeBar'),
             micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = F)
 
 #To get all regional plots

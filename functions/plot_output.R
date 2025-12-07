@@ -82,6 +82,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       group_by(scenario, period, region, decileGroup) %>%
       summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")%>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -90,6 +92,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       group_by(scenario, period) %>%
       summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -602,6 +606,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       ) %>%
       ungroup() %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -1357,20 +1363,27 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist == 'ineqWorld_Gini' | allExport  )){
     
     plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region == 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|Gini'))
-   
+      filter(
+        period <= 2100,
+        region == "World",
+        category %in% c("TotalWithTransfNeut", "Reference", "TotalWithTransfEpc"),
+        variable %in% c("ineq|Gini")
+      )
+    
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025")
-      
-   plotdf <- plotdf %>%
-     filter( scenario != "C_SSP2-NPi2025" ) %>% 
-     bind_rows(
-       plotdf_ref %>% dplyr::mutate(scenario = "C_SSP2-hiOS-def"),
-       plotdf_ref %>% dplyr::mutate(scenario = "C_SSP2-loOS-def")
-     )
+    
+    # build all scenario names like "C_SSP2-hiOS-def-PkBudg650" etc.
+    scen_names <- paste0("C_", all_runscens, "-", all_budgets)
+    
+    plotdf <- plotdf %>%
+      filter(scenario != "C_SSP2-NPi2025") %>%
+      bind_rows(
+        map_dfr(
+          scen_names,
+          ~ plotdf_ref %>% mutate(scenario = .x)
+        )
+      )
 
 
     
@@ -1461,6 +1474,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
              variable ='ineq|deltaGini') %>%
       select(-ref)  %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -1530,6 +1545,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
              variable ='ineq|deltaTheilL') %>%
       select(-ref)  %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -1596,6 +1613,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
              variable ='ineq|deltaTheilT') %>%
       select(-ref)  %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -1666,13 +1685,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025")
     
-    plotdf <- plotdf %>%
-      filter( scenario != "C_SSP2-NPi2025" ) %>% 
-      bind_rows(
-        plotdf_ref %>% dplyr::mutate(scenario = "C_SSP2-hiOS-def"),
-        plotdf_ref %>% dplyr::mutate(scenario = "C_SSP2-loOS-def")
-      )
+    scen_names <- paste0("C_", all_runscens, "-", all_budgets)
     
+    plotdf <- plotdf %>%
+      filter(scenario != "C_SSP2-NPi2025") %>%
+      bind_rows(
+        map_dfr(
+          scen_names,
+          ~ plotdf_ref %>% mutate(scenario = .x)
+        )
+      )
     
     
     
@@ -1746,6 +1768,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
              variable ='ineq|deltaGini') %>%
       select(-ref)  %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -1826,6 +1850,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         x = period_num + scen_off
       ) %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       ))) 
@@ -1835,6 +1861,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
       summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       ))) 
@@ -1921,6 +1949,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       x = period_num + scen_off
     ) %>%
     mutate(scenario = factor(scenario, levels = c(
+      "C_SSP2-PkBudg1000", 
+      "C_SSP2-PkBudg650",
       "C_SSP2-loOS-def", 
       "C_SSP2-hiOS-def" 
     ))) 
@@ -1930,6 +1960,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
     summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
     mutate(scenario = factor(scenario, levels = c(
+      "C_SSP2-PkBudg1000", 
+      "C_SSP2-PkBudg650",
       "C_SSP2-loOS-def", 
       "C_SSP2-hiOS-def" 
     ))) 
@@ -2016,6 +2048,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         x = period_num + scen_off
       ) %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       ))) 
@@ -2025,6 +2059,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
       summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       ))) 
@@ -2120,7 +2156,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tt.iw|delta" = "Within",
                                 "Tt.i|delta" = "Total")) %>%
       mutate(scenario = factor(scenario, levels = c(
-        
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -2185,7 +2222,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tl.iw|delta" = "Within",
                                 "Tl.i|delta" = "Total")) %>%
       mutate(scenario = factor(scenario, levels = c(
-        
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -2258,7 +2296,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tt.iw|delta" = "Within",
                                 "Tt.i|delta" = "Total")) %>%
       mutate(scenario = factor(scenario, levels = c(
-        
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -2323,7 +2362,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tl.iw|delta" = "Within",
                                 "Tl.i|delta" = "Total")) %>%
       mutate(scenario = factor(scenario, levels = c(
-        
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -2408,6 +2448,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         mutate(region = 'total') %>%
         bind_rows(plotdf) %>%
         mutate(scenario = factor(scenario, levels = c(
+          "C_SSP2-PkBudg1000",
+          "C_SSP2-PkBudg650",
           "C_SSP2-loOS-def", 
           "C_SSP2-hiOS-def" 
         )))
@@ -2470,6 +2512,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         mutate(region = 'total') %>%
         bind_rows(plotdf) %>%
         mutate(scenario = factor(scenario, levels = c(
+          "C_SSP2-PkBudg1000",
+          "C_SSP2-PkBudg650",
           "C_SSP2-loOS-def", 
           "C_SSP2-hiOS-def" 
         )))
@@ -2545,6 +2589,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         mutate(region = 'total') %>%
         bind_rows(plotdf) %>%
         mutate(scenario = factor(scenario, levels = c(
+          "C_SSP2-PkBudg1000",
+          "C_SSP2-PkBudg650",
           "C_SSP2-loOS-def", 
           "C_SSP2-hiOS-def" 
         )))
@@ -2607,6 +2653,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       mutate(region = 'total') %>%
       bind_rows(plotdf) %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
       )))
@@ -2670,10 +2718,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   #---------------------------6 Global tax revenue ------------------
   if(any(plotlist == 'taxRevenueWorld' | allExport  )){
     
-    revenue_smoothed <- compute_transfer(data3, data2, revenue = 1) %>%
+    revenue_smoothed <- compute_transfer(data3, data2, climaFund = 1, revenueRep = 1) %>%
       group_by(scenario,period) %>%
-      summarise(value = sum(revenue_smoothed)) %>%
-      filter(period <=2100)
+      summarise(value = sum(revenue)) %>%
+      filter(period <= 2100)
     
     plotdf <- bind_rows(
       # World total from MAgPIE (constructed)
@@ -2700,6 +2748,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       ) %>%
       filter(period <= 2100) %>%
       mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def",
         "C_SSP2-hiOS-def"
       )))
@@ -2779,109 +2829,109 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
 
   
-  if(any(plotlist == 'taxRevenueLAM' | allExport  )){
-    
-    revenue_smoothed <- compute_transfer(data3, data2, revenue = 1) %>%
-      filter(period <=2100) %>%
-      filter(region == 'LAM') %>%
-      rename(value = 'revenue_smoothed') %>%
-      filter(scenario =='C_SSP2-hiOS-def')
-    
-    plotdf <- bind_rows(
-      # World rows already present in data (any model)
-      data3 %>%
-        filter(str_starts(variable, "Taxes"),
-               region == "LAM") %>%
-        mutate(variable = str_remove(variable, "^Taxes\\|?"))
-    ) %>%
-      # keep only the two layers we want to stack
-      filter(variable %in% c("GHG|REMIND", "GHG|MAGPIE")) %>%
-      # control stacking order: bottom -> top
-      mutate(
-        variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
-        # make sure x is ordered for area stacking
-        period = as.integer(period)
-      ) %>%
-      filter(period <= 2100) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-loOS-def",
-        "C_SSP2-hiOS-def"
-      ))) %>%
-      filter(scenario =='C_SSP2-hiOS-def')
-    
-    
-    sumdf <- plotdf %>%
-      group_by(scenario, period) %>%
-      summarise(total = sum(value, na.rm = TRUE), .groups = "drop") 
-    
-    p[[paste0("taxRevenueLAM")]] <- list(
-      plot =
-        ggplot(plotdf, aes(x = period, y = value, fill = variable)) +
-        geom_area(alpha = 0.7, color = NA, position = "stack") +
-        geom_line(
-          data = sumdf,
-          aes(x = period, y = total, color = "Total"),
-          inherit.aes = FALSE,
-          linewidth = 0.8,
-          linetype = "solid"
-        ) +
-        geom_line(
-          data = revenue_smoothed,
-          aes(x= period, y =value),
-          color = "#446482",
-          inherit.aes = FALSE,
-          linewidth = 0.8,
-          linetype = "dashed"
-        )+
-        facet_wrap(
-          ~ scenario, ncol = 2,
-          labeller = as_labeller(c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def"   = "1.5°C HO",
-            "C_SSP2-loOS-def"   = "1.5°C LO"
-          ))
-        ) +
-        scale_fill_paletteer_d(
-          "dutchmasters::view_of_Delft",
-          name   = "Source",
-          labels = c("Energy system", "Land sector")
-        ) +
-        scale_color_manual(
-          name   = "",
-          values = c("Total" = "#446482"),    
-          labels = c("Total" = "Total net revenue")
-        ) +
-        guides(
-          fill  = guide_legend(order = 1),
-          color = guide_legend(order = 2, override.aes = list(linetype = "solid", linewidth = 1.2))
-        ) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
-        labs(x = "Year", y = "Carbon revenue (billion$)") 
-      # theme_minimal() +
-      # theme(
-      #   legend.position = "bottom",
-      #   strip.text = element_blank(),
-      #   axis.text.x = element_text(angle = 45, hjust = 1),
-      #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-      #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-      #   panel.grid.minor.x = element_blank(),
-      #   panel.grid.minor.y = element_blank(),
-      #   panel.background   = element_rect(fill = "white", color = NA)
-      # )
-      ,
-      
-      width  = 4,
-      height = 3
-    )
-    
-    
-    
-    
-    
-  } 
-  
+  # if(any(plotlist == 'taxRevenueLAM' | allExport  )){
+  #   
+  #   revenue_smoothed <- compute_transfer(data3, data2, revenue = 1) %>%
+  #     filter(period <=2100) %>%
+  #     filter(region == 'LAM') %>%
+  #     rename(value = 'revenue_smoothed') %>%
+  #     filter(scenario =='C_SSP2-hiOS-def')
+  #   
+  #   plotdf <- bind_rows(
+  #     # World rows already present in data (any model)
+  #     data3 %>%
+  #       filter(str_starts(variable, "Taxes"),
+  #              region == "LAM") %>%
+  #       mutate(variable = str_remove(variable, "^Taxes\\|?"))
+  #   ) %>%
+  #     # keep only the two layers we want to stack
+  #     filter(variable %in% c("GHG|REMIND", "GHG|MAGPIE")) %>%
+  #     # control stacking order: bottom -> top
+  #     mutate(
+  #       variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
+  #       # make sure x is ordered for area stacking
+  #       period = as.integer(period)
+  #     ) %>%
+  #     filter(period <= 2100) %>%
+  #     mutate(scenario = factor(scenario, levels = c(
+  #       "C_SSP2-loOS-def",
+  #       "C_SSP2-hiOS-def"
+  #     ))) %>%
+  #     filter(scenario =='C_SSP2-hiOS-def')
+  #   
+  #   
+  #   sumdf <- plotdf %>%
+  #     group_by(scenario, period) %>%
+  #     summarise(total = sum(value, na.rm = TRUE), .groups = "drop") 
+  #   
+  #   p[[paste0("taxRevenueLAM")]] <- list(
+  #     plot =
+  #       ggplot(plotdf, aes(x = period, y = value, fill = variable)) +
+  #       geom_area(alpha = 0.7, color = NA, position = "stack") +
+  #       geom_line(
+  #         data = sumdf,
+  #         aes(x = period, y = total, color = "Total"),
+  #         inherit.aes = FALSE,
+  #         linewidth = 0.8,
+  #         linetype = "solid"
+  #       ) +
+  #       geom_line(
+  #         data = revenue_smoothed,
+  #         aes(x= period, y =value),
+  #         color = "#446482",
+  #         inherit.aes = FALSE,
+  #         linewidth = 0.8,
+  #         linetype = "dashed"
+  #       )+
+  #       facet_wrap(
+  #         ~ scenario, ncol = 2,
+  #         labeller = as_labeller(c(
+  #           "C_SSP2-PkBudg1000" = "2°C",
+  #           "C_SSP2-PkBudg650"  = "1.5°C",
+  #           "C_SSP2-hiOS-def"   = "1.5°C HO",
+  #           "C_SSP2-loOS-def"   = "1.5°C LO"
+  #         ))
+  #       ) +
+  #       scale_fill_paletteer_d(
+  #         "dutchmasters::view_of_Delft",
+  #         name   = "Source",
+  #         labels = c("Energy system", "Land sector")
+  #       ) +
+  #       scale_color_manual(
+  #         name   = "",
+  #         values = c("Total" = "#446482"),    
+  #         labels = c("Total" = "Total net revenue")
+  #       ) +
+  #       guides(
+  #         fill  = guide_legend(order = 1),
+  #         color = guide_legend(order = 2, override.aes = list(linetype = "solid", linewidth = 1.2))
+  #       ) +
+  #       scale_x_continuous(breaks = unique(plotdataWelf$period),
+  #                          labels = unique(plotdataWelf$period)) +
+  #       labs(x = "Year", y = "Carbon revenue (billion$)") 
+  #     # theme_minimal() +
+  #     # theme(
+  #     #   legend.position = "bottom",
+  #     #   strip.text = element_blank(),
+  #     #   axis.text.x = element_text(angle = 45, hjust = 1),
+  #     #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+  #     #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+  #     #   panel.grid.minor.x = element_blank(),
+  #     #   panel.grid.minor.y = element_blank(),
+  #     #   panel.background   = element_rect(fill = "white", color = NA)
+  #     # )
+  #     ,
+  #     
+  #     width  = 4,
+  #     height = 3
+  #   )
+  #   
+  #   
+  #   
+  #   
+  #   
+  # } 
+  # 
   #-------------End 6 Global tax revenue-------------
     
   
@@ -3159,8 +3209,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     }
     
     
-    plotdataIneq$ineq %>% filter(variable == 'ineq|Gini')
-    
     gini <- plotdataIneq[['ineq']] %>%
       filter( period <= 2100,
               region != 'World',
@@ -3184,6 +3232,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       left_join(regionMapping, by = c("iso_a3" = "geo")) %>%
       filter(!is.na(region))
     
+    world_gini <- world_reg %>%
+      left_join(gini_ref, by = "region")
     
     centroids <- world_reg %>%
       group_by(region) %>%
@@ -3195,6 +3245,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       ) %>%
       st_drop_geometry()
     
+
     
     centroids_gini <- centroids %>%
       left_join(gini_ref, by = "region")
@@ -3275,7 +3326,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'regionIneqChangeBar_Gini' | allExport  )){
     
-    for(scen in c("C_SSP2-hiOS-def","C_SSP2-loOS-def")){
+    for(scen in paste0( 'C_',all_runscens,'-',all_budgets)){
       
       gini <- plotdataIneq[['ineq']] %>%
         filter( period <= 2100,
@@ -3284,67 +3335,84 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
       gini_ref <- gini %>% filter(scenario == 'C_SSP2-NPi2025') %>%
         select(-scenario,-category) %>%
-        rename(ref = value) %>%
-        filter(period == 2040)
+        rename(ref = value)
       
       
       plotdf <- gini %>%
         filter(scenario != 'C_SSP2-NPi2025') %>%
-        left_join(plotdf_ref, by = c('region', 'period', 'variable')) %>%
+        left_join(gini_ref, by = c('region', 'period', 'variable')) %>%
         rename(pol = value) %>%
         mutate(change = (pol - ref) * 100,
                variable ='ineq|deltaGini') %>%
         mutate(scenario = factor(scenario, levels = c(
           "C_SSP2-loOS-def", 
-          "C_SSP2-hiOS-def" 
+          "C_SSP2-hiOS-def",
+          "C_SSP2-PkBudg1000",
+          "C_SSP2-PkBudg650"
+          
         )),
         category = factor(category, levels = c(
           'TotalWithTransfNeut',
           'TotalWithTransfEpc'
         ))) %>% 
-        filter( period %in% c(2040, 2100),
+        filter( period %in% c(2040, 2060, 2100),
                 scenario == scen)
       
       regOrder <- plotdf %>% 
         filter(
-          period   == 2040,
+          period   == 2060,
           scenario == scen,
           category == "TotalWithTransfNeut"
         ) %>%
         arrange(change) %>%          # ascending; use desc(change) for reverse
         pull(region)
       
-      plotdf <- plotdf %>%
-        mutate(region = factor(region, levels = regOrder))
+      max_abs <- 5
+      
+      plotdf_cap <- plotdf %>%
+        mutate(
+          region = factor(region, levels = regOrder),
+          change_cap  = pmax(pmin(change, max_abs), -max_abs),
+          is_clipped  = abs(change) > max_abs,
+          sign_change = sign(change),
+          label_y     = change_cap +2.5 + 0.5 * sign_change  # a bit beyond capped bar
+        )
       
       
       p[[paste0('regionIneqChangeBar_Gini_',scen)]] <- list(
         
-        plot = ggplot(plotdf, aes(
-          x    = region,  # order by change
-          y    = change,
+        plot = ggplot(plotdf_cap, aes(
+          x    = region,
+          y    = change_cap,
           fill = region
         )) +
           geom_col() +
           geom_hline(yintercept = 0, color = "grey60") +
-          coord_flip()+
+          geom_text(
+            data = subset(plotdf_cap, is_clipped),
+            aes(y = label_y, label = round(change, 2)),
+            size = 3
+          ) +
+          scale_y_continuous(limits = c(-5, 5)) + 
+          coord_flip() +
           scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
           labs(
             x = NULL,
             y = "Gini change (points)",
-            title = paste("Gini change from reference"),
+            title    = "Gini change from reference",
             subtitle = scen
           ) +
-          facet_grid( category ~ period )+
+          facet_grid(category ~ period) +
           theme_minimal() +
           theme(
             panel.grid.major.y = element_blank(),
             legend.position    = "right",
             panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.4)
-          )  
+          )
+        
         ,
         
-        width  = 8,
+        width  = 10,
         height = 6
         
       )

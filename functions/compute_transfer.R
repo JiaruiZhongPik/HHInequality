@@ -1,5 +1,7 @@
 
-compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "neut", revenue = 0){
+compute_transfer <- function (data1 = data, data2 = decileConsShare, 
+                              climaFund = 1, fund_return_scale = 1,
+                              recycle = "neut", revenueRep = 0){
   
   ir2130 <- data1 %>%
     filter(variable == "Interest Rate (t+1)/(t-1)|Real",
@@ -41,12 +43,13 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
     mutate(
       year_gap = period - dplyr::lag(period, default = first(period)),
       r_lag    = dplyr::lag(r,      default = first(r)),
+      r_fund_lag  = fund_return_scale * r_lag,
       # PV weights relative to first row
       df = {
         acc <- numeric(dplyr::n()); acc[1] <- 1
         if (dplyr::n() > 1) {
           for (i in 2:dplyr::n()) {
-            acc[i] <- acc[i-1] / ((1 + r_lag[i])^(year_gap[i]))
+            acc[i] <- acc[i-1] / ((1 + r_fund_lag[i])^(year_gap[i]))
           }
         }
         acc
@@ -61,7 +64,7 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
       PV_neg   = sum(pmax(-revenue, 0) * df, na.rm = TRUE),
       alpha    = dplyr::if_else(PV_pos > 0, pmin(pmax(PV_neg / PV_pos, 0), 1), 0),
       .groups = "drop"
-    )
+    ) 
   
   joined_alpha <- joined %>% left_join(alphas, by = c("scenario","region"))
   
@@ -80,7 +83,7 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
     
     for (i in seq_len(n)) {
       if (i > 1) {
-        fund <- fund * (1 + df_grp$r_lag[i])^(df_grp$year_gap[i])
+        fund <- fund * (1 + df_grp$r_fund_lag[i])^(df_grp$year_gap[i])
       }
       rev_i <- df_grp$revenue[i]
       
@@ -120,8 +123,16 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
     ungroup() %>%
     select(scenario, region, period, interest = r, revenue_raw = revenue,
            alpha, saved, payout, recycled_now, fund_balance) %>%
-    rename(revenue_smoothed = recycled_now)%>%
-    select(scenario, region, period, revenue_smoothed) 
+    rename(revenue = recycled_now)%>%
+    select(scenario, region, period, revenue) 
+  
+  
+  if(climaFund == 1) {
+    revenue = revenue_smoothed
+  } else {
+    revenue = rev
+  }
+  
   
   if(recycle == 'epc'){
     
@@ -131,8 +142,8 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
              region != 'World') %>%
       rename(population = value) %>%
       select(scenario,region,period, population) %>%
-      left_join(revenue_smoothed, by = c("scenario", "region", "period")) %>% 
-      mutate(transferEpc = (revenue_smoothed * 1e9) / (population * 1e6)) %>%
+      left_join(revenue, by = c("scenario", "region", "period")) %>% 
+      mutate(transferEpc = (revenue * 1e9) / (population * 1e6)) %>%
       select(scenario,region,period,transferEpc) %>% 
       crossing(decileGroup = 1:10) %>%
       arrange(scenario, region, period, decileGroup) 
@@ -156,17 +167,17 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare, recycle = "
              region != 'World') %>%
       rename(population = value) %>%
       select(scenario,region,period, population) %>%
-      left_join(revenue_smoothed, by = c("scenario", "region", "period")) %>%
-      mutate(revenue_smoothed_ca =revenue_smoothed * 1e3 / population ) %>%
+      left_join(revenue, by = c("scenario", "region", "period")) %>%
+      mutate(revenue_ca =revenue * 1e3 / population ) %>%
       right_join(weight,by = c("scenario", "region", "period") ) %>%
-      mutate( transferNeut =  revenue_smoothed_ca * consShare * 10) %>%
+      mutate( transferNeut =  revenue_ca * consShare * 10) %>%
       select(scenario, region, period,decileGroup,transferNeut)
 
   }
   
-  if(revenue ==1){
-    return(revenue_smoothed)
-  }else if(revenue!=1){
+  if(revenueRep == 1){
+    return(revenue)
+  } else {
     return(transfer)
   }
   

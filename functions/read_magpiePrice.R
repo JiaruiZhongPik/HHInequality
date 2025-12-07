@@ -33,7 +33,7 @@ read_magpiePrice <- function(magpiepath) {
   
   priceAvg <- priceFAFH * fafhShr + priceFAH * (1-fafhShr)
   
-  getNames( priceAvg) <- sub("\\..*$", "", getNames( priceAvg))
+  magclass::getNames(priceAvg) <- sub("\\..*$", "", magclass::getNames(priceAvg))
   
   
   # aggregate both to 4 categories based on demand 

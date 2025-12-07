@@ -21,6 +21,7 @@ source('functions/plot_output.R')
 source('functions/plot_outputNCC.R')
 source('functions/aggregate_decileWelfChange.R')
 source('functions/compute_inequalityMetrics.R')
+source('functions/compute_transfer.R')
 
 
 #Load library
@@ -92,7 +93,7 @@ micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of ye
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','_prone_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','_fundReturnScale75_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -146,7 +147,8 @@ plot_inspection(outputPath = outputPath,
                 allExport=T)
 
 
-decileWelfChange <- predict_decileWelfChange(data, decileConsShare, micro_model, fixed_point) # unit log different change in %
+decileWelfChange <- predict_decileWelfChange(data, decileConsShare, fund_return_scale = 0.5,
+                                             micro_model, fixed_point) # unit log different change in %
 
 #to get some aggregated results
 # out <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, 
@@ -179,6 +181,7 @@ plot_outputNCC()
 
 
 #any individual plot
+source('functions/plot_output.R')
 p <- plot_output(outputPath = outputPath, 
                  data1  = decileWelfChange, 
                  data2 = decileConsShare, 

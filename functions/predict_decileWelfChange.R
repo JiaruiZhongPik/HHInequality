@@ -5,6 +5,7 @@
 #-------------1. First-order welfare effect-------------------------
 
 predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, 
+                                     fund_return_scale = 1,
                                      micro_model = 'FOwelfare', fixed_point = 'midpoint'){
   
   #get sectors for later use
@@ -203,6 +204,17 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     
   }else(print ('Other approach not yet implemented'))
   
+  
+  #Compute transfer
+
+
+  transferEpc <- compute_transfer(data1 = data1, data2 = data2, 
+                                  climaFund = 1, fund_return_scale = fund_return_scale, 
+                                  recycle ='epc')
+  transferNeut <- compute_transfer(data1 = data1, data2 = data2, 
+                                   climaFund = 0, fund_return_scale = fund_return_scale,
+                                   recycle ='neut')
+  
 
   #Add total consumption budget effect (inequality neutral)
   decileWelfChange <-
@@ -240,108 +252,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
     } %>%
     bind_rows(decileWelfChange)
   
-  
-  
-  #Tax revenue recycling
-  
-  # #Approach 1: per period recycling
-  # # Progressive: equal per capita transfer
-  # transferEpc <-   data1 %>%
-  #   filter(variable %in% c('Taxes|GHG|MAGPIE','Taxes|GHG|REMIND','Population'),
-  #          scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets ),
-  #          region != 'World') %>%
-  #   select(-model, -baseline) %>%
-  #   calc_addVariable(
-  #     "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
-  #     "transferEpc" = "`Taxes|GHG` * 1e3 / `Population`" ,
-  #     units = c('billion US$2017/yr', 'US$2017/person/yr')
-  #   ) %>%
-  #   filter(variable == 'transferEpc') %>%
-  #   select(-variable, -unit) %>%
-  #   rename(transferEpc = value) %>%
-  #   crossing(decileGroup = 1:10) %>%
-  #   arrange(scenario, region, period, decileGroup)
-  
  
- #  #Approach 2: year anuity
- # 
- # df <- data1 %>%
- #   filter(
- #     variable %in% c("Taxes|GHG|MAGPIE", "Taxes|GHG|REMIND", "Interest Rate (t+1)/(t-1)|Real"),
- #     scenario %in% paste0( 'C_',all_runscens,'-',all_budgets ),
- #     region != "World"
- #   ) %>%
- #   select(-model, -baseline) %>%
- #   left_join(ir2130, by = c("scenario", "region")) %>%
- #   mutate(
- #     value = if_else(
- #       variable == "Interest Rate (t+1)/(t-1)|Real" & period == 2150 & is.na(value),
- #       value_2130,
- #       value
- #     )
- #   ) %>%
- #   select(-value_2130) %>%
- #   calc_addVariable(
- #     "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
- #     units         = c("billion US$2017/yr")
- #   ) %>% filter(variable %in% c('Taxes|GHG','Interest Rate (t+1)/(t-1)|Real')) 
- # 
- # ir  <- df %>% filter(variable == "Interest Rate (t+1)/(t-1)|Real")  %>% select(scenario, region, period, r = value)
- # rev <- df %>% filter(variable == "Taxes|GHG") %>% select(scenario, region, period, revenue = value)
- # 
- # 
- # revenue_smoothed <- rev %>%
- #   left_join(ir, by = c("scenario", "region", "period")) %>%
- #   arrange(scenario, region, period) %>%
- #   group_by(scenario, region) %>%
- #   # Determine gap to previous timestamp
- #   mutate(year_gap = period - dplyr::lag(period, default = first(period)),
- #          r_lag    = dplyr::lag(r, default = first(r)),
- #          df = {
- #            # compute multiplicative accumulation per row
- #            # start with 1 at the first row
- #            acc <- numeric(dplyr::n())
- #            acc[1] <- 1
- #            if (dplyr::n() > 1) {
- #              for (i in 2:dplyr::n()) {
- #                acc[i] <- acc[i-1] / ((1 + r_lag[i])^(year_gap[i]))
- #              }
- #            }
- #            acc
- #          }
- #   ) %>%
- #   # Present value of the raw stream and annuity factor
- #   mutate(pv_component = revenue * df) %>%
- #   mutate(
- #     pv_total = sum(pv_component, na.rm = TRUE),
- #     af       = sum(df, na.rm = TRUE),
- #     annuity  = ifelse(af == 0, NA_real_, pv_total / af)
- #   ) %>%
- #   # The smoothed revenue each observed year
- #   mutate(revenue_smoothed = annuity) %>%
- #   ungroup() %>%
- #   select(scenario, region, period, revenue_smoothed)
- # 
- #   
- # 
- # transferEpc <- 
- #   data1 %>%
- #     filter(variable %in% c('Population'),
- #            scenario %in% paste0( 'C_',all_runscens,'-',all_budgets ),
- #            region != 'World') %>%
- #     rename(population = value) %>%
- #     select(scenario,region,period, population) %>%
- #   left_join(revenue_smoothed, by = c("scenario", "region", "period")) %>% 
- #     mutate(transferEpc = (revenue_smoothed * 1e9) / (population * 1e6)) %>%
- #     select(scenario,region,period,transferEpc) %>% 
- #     crossing(decileGroup = 1:10) %>%
- #     arrange(scenario, region, period, decileGroup)
-      
- #Approach 3:
- source('functions/compute_transfer.R')
- transferEpc <- compute_transfer(data1 = data1, data2 = data2, recycle ='epc')
- transferNeut <- compute_transfer(data1 = data1, data2 = data2, recycle ='neut')
-  
   decileWelfChange <- decileConsShare %>%
     select(scenario, region, period, decileGroup, consumptionCa) %>% 
     left_join(transferEpc,by = c('scenario', 'region', 'period','decileGroup')) %>%

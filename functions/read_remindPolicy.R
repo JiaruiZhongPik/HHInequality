@@ -153,16 +153,13 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
     select(-sector, -carrier) %>%
     rename(unit = quantity_unit, value = quantity)
   
-  #Note JZ: the revenue computed with this approach is similar to the REMIND2 
-  #reported variable "Revenue|Government|Tax|Carbon", consider to use that.
   
   Tax_remind <- 
    remind_data %>% 
     filter( variable == 'Revenue|Government|Tax|Carbon' ) %>%
     mutate( #value = pmax(value, 0),
            variable = "Taxes|GHG|REMIND" )
-  print("warning: take negative revenues, yet this mess up revenue recycling, 
-        should be balanced")
+
   
   carbonPrice <- remind_data %>% 
     filter( variable == 'Price|Carbon' )

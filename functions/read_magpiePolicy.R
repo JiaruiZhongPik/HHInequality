@@ -5,6 +5,13 @@ read_magpiePolicy <- function(magpierun, magpiepath, magpie_base, magpiepath_bas
   #This function computes the price changes of policies scenarios and expendtures
   #of the policy and baseline scenarios.
  
+  #For testing purpose
+  # magpierun <- all_paths$magpie_run[1]
+  # magpiepath <- all_paths$magpie_path[1]
+  # magpie_base <- all_paths$magpie_base[1]
+  # magpiepath_base <- all_paths$magpie_path_base[1]
+  
+  
   priceRun <- read_magpiePrice(magpiepath) 
   priceBase <-  read_magpiePrice(magpiepath_base) 
   
@@ -80,14 +87,14 @@ read_magpiePolicy <- function(magpierun, magpiepath, magpie_base, magpiepath_bas
   
   #get tax revenue
   priceGHG <- PriceGHG(magpiepath)
-  getNames(priceGHG) <- 
-    gsub("co2_c","co2",getNames(priceGHG)) %>% 
+  magclass::getNames(priceGHG) <- 
+    gsub("co2_c","co2",magclass::getNames(priceGHG)) %>% 
     gsub("n2o_n_direct","n2o",.)
   
   emi <- Emissions(magpiepath, type = c('co2_c','n2o_n','ch4'), unit = 'gas', subcategories = TRUE, inorg_fert_split = FALSE)
   emi <- dimOrder(emi, perm = c(2,1))
   
-  assert_that(all(getNames(emi) == getNames(priceGHG)))
+  assert_that(all(magclass::getNames(emi) == magclass::getNames(priceGHG)))
   
   # tax revenue in million $ MER (only CH4 and N2O, see above)
   if (!magpie_includeCO2rev){
