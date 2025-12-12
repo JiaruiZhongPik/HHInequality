@@ -5,7 +5,9 @@
 #-------------1. First-order welfare effect-------------------------
 
 predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, 
+                                     climaFund = 0,
                                      fund_return_scale = 1,
+                                     payg = 1,
                                      micro_model = 'FOwelfare', fixed_point = 'midpoint'){
   
   #get sectors for later use
@@ -207,13 +209,17 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
   
   #Compute transfer
 
-
   transferEpc <- compute_transfer(data1 = data1, data2 = data2, 
-                                  climaFund = 1, fund_return_scale = fund_return_scale, 
+                                  climaFund = climaFund, fund_return_scale = fund_return_scale, 
+                                  payg = 1,
                                   recycle ='epc')
   transferNeut <- compute_transfer(data1 = data1, data2 = data2, 
-                                   climaFund = 0, fund_return_scale = fund_return_scale,
+                                   climaFund = climaFund, fund_return_scale = fund_return_scale,
+                                   payg = 1,
                                    recycle ='neut')
+  
+    
+  
   
 
   #Add total consumption budget effect (inequality neutral)

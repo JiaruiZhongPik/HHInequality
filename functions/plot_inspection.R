@@ -58,6 +58,45 @@ plot_inspection <- function( outputPath,
     
   }
   
+    
+      
+  if(any(plotlist == "shockAllScen") | allExport){
+      
+      
+      plotdf <- dataPrice %>% 
+        filter (grepl("^relaPrice", variable)) %>%
+        mutate(variable = str_remove(variable, "^deltPrice\\|"))
+      
+        
+        p[["shockAllScen"]] <- list(
+          plot = ggplot(plotdf, aes(x = period, y = (value-1)*100, color = variable, linetype = scenario)) +
+            geom_line(linewidth = 1) +
+            facet_wrap(~ region, scales = "free_y") +  # optional: free_y if regions differ a lot
+            scale_color_paletteer_d("ggthemes::Classic_10") +
+            labs(
+              x = "Year",
+              y = "% change of price",
+              color = "Variable",
+              linetype = "Scenario"
+            ) +
+            theme_minimal() +
+            theme(
+              legend.position = "bottom",
+              axis.text.x = element_text(angle = 45, hjust = 1),
+              strip.text = element_text(face = "bold")
+            )
+          
+          ,
+          
+          width = 10,
+          height = 8
+          
+        )
+
+      
+      
+    }
+  
   #-------------------End. inspecting price shocks------------------------------
   
   

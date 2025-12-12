@@ -1816,6 +1816,73 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
+  if(any(plotlist == 'ineqReg_TheilLRela' | allExport  )){
+    
+    plotdf <- plotdataIneq[['ineq']] %>%
+      filter( period <= 2100 ,
+              region != 'World',
+              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
+              variable %in% c('ineq|TheilL'))
+    
+    plotdf_ref <- plotdf %>%
+      filter(scenario == "C_SSP2-NPi2025") %>%
+      select(-scenario,-category) %>%
+      rename(ref = value)
+    
+    plotdf <- plotdf %>% filter(scenario != 'C_SSP2-NPi2025') %>%
+      left_join(plotdf_ref, by = c('region', 'period', 'variable' )) %>%
+      mutate(value = (value - ref) * 100,
+             variable ='ineq|deltaTheilL') %>%
+      select(-ref)  %>%
+      mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
+        "C_SSP2-loOS-def", 
+        "C_SSP2-hiOS-def" 
+      )))
+    
+    
+    # Automate over all scenarios
+    p[['ineqReg_TheilLRela']] <- list(
+      
+      plot = ggplot(plotdf, 
+                    aes(x = period, y = value, 
+                        linetype = category, color = scenario)) +
+        geom_line() + 
+        geom_hline(yintercept = 0)+
+        facet_wrap(~region, ncol = 3,
+                   scales = "free_y" ) +
+        labs(x = "Decile", y = "Theil'L Change from reference (points)", 
+             color = "Measure", linetype = "Scenario-State") +
+        #coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
+        scale_color_manual(
+          name   = "Scenario",  # legend title
+          values = myScenPalette,
+          breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
+                     "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
+          labels = c(
+            "C_SSP2-PkBudg1000" = "2°C",
+            "C_SSP2-PkBudg650"  = "1.5°C",
+            "C_SSP2-hiOS-def"   = "1.5°C HO",
+            "C_SSP2-loOS-def"   = "1.5°C LO"
+          )
+        ) +
+        scale_linetype_manual(name = "Compensation",
+                              values = c("TotalWithTransfNeut" = "solid", 
+                                         "TotalWithTransfEpc" = "dashed"),
+                              labels = c("TotalWithTransfNeut" = "Neutral",
+                                         "TotalWithTransfEpc" = "EPC"))
+      ,
+      
+      width = 10,
+      height = 8
+      
+    )
+    
+    
+    
+  }
+  
 #---------------------------------End------------------------------------------
   
   
@@ -2718,7 +2785,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   #---------------------------6 Global tax revenue ------------------
   if(any(plotlist == 'taxRevenueWorld' | allExport  )){
     
-    revenue_smoothed <- compute_transfer(data3, data2, climaFund = 1, revenueRep = 1) %>%
+    revenue_smoothed <- compute_transfer(data3, data2, climaFund = 0,
+                                         fund_return_scale = 1,
+                                         payg = 1,, revenueRep = 1) %>%
       group_by(scenario,period) %>%
       summarise(value = sum(revenue)) %>%
       filter(period <= 2100)

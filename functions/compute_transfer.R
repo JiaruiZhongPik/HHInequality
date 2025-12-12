@@ -1,6 +1,7 @@
 
 compute_transfer <- function (data1 = data, data2 = decileConsShare, 
                               climaFund = 1, fund_return_scale = 1,
+                              payg =1,
                               recycle = "neut", revenueRep = 0){
   
   ir2130 <- data1 %>%
@@ -148,6 +149,13 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare,
       crossing(decileGroup = 1:10) %>%
       arrange(scenario, region, period, decileGroup) 
     
+    if(payg ==1) {
+      transfer <- transfer %>% 
+        mutate(
+          transferEpc = if_else(transferEpc < 0, 0, transferEpc)
+        )
+    }
+    
   } else if(recycle == 'neut'){
     
     weight <- data2 %>%
@@ -172,8 +180,19 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare,
       right_join(weight,by = c("scenario", "region", "period") ) %>%
       mutate( transferNeut =  revenue_ca * consShare * 10) %>%
       select(scenario, region, period,decileGroup,transferNeut)
+    
+    if(payg ==1) {
+      transfer <- transfer %>% 
+        mutate(
+          transferNeut = if_else(transferNeut < 0, 0, transferNeut)
+        )
+    }
+    
 
   }
+  
+  
+
   
   if(revenueRep == 1){
     return(revenue)
@@ -182,6 +201,8 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare,
   }
   
 
+  
+  
 }
 
 

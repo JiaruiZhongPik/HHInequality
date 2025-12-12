@@ -86,14 +86,14 @@ REMIND_pattern <- "REMIND_generic*.mif"
 regions <- 'H12'                            # options are H12 or H21, seemingly redundant
 regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
 regressRegGrouping <- 'pool'                # options are: "H12", "H21", "country", "pool"
-consData <- 'gcd'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
+consData <- 'mcc'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','_fundReturnScale75_',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-MCCjoint-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -147,13 +147,14 @@ plot_inspection(outputPath = outputPath,
                 allExport=T)
 
 
-decileWelfChange <- predict_decileWelfChange(data, decileConsShare, fund_return_scale = 0.5,
+decileWelfChange <- predict_decileWelfChange(data, decileConsShare, 
+                                             climaFund = 0,
+                                             fund_return_scale = 0.5,
+                                             payg = 1,
                                              micro_model, fixed_point) # unit log different change in %
 
-#to get some aggregated results
-# out <- aggregate_decileWelfChange(data1 = decileWelfChange, data2 = decileConsShare, data3 = data, 
-#                            level = c("full"), region = 'region')
-# write.csv(out, 'result.csv')
+# ZJ: make sense to separate consumption effect and transfer effect, as the latter is getting more important
+
 
 #To do needs debug for Neutral transfer
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
@@ -188,7 +189,7 @@ p <- plot_output(outputPath = outputPath,
                  data3 = data, 
                  plotdataIneq = ineq,
                  exampleReg = 'IND',
-                 plotlist = c('regionIneqChangeBar_Gini'),
+                 plotlist = c('ineqReg_TheilLRela'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
