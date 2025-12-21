@@ -86,14 +86,14 @@ REMIND_pattern <- "REMIND_generic*.mif"
 regions <- 'H12'                            # options are H12 or H21, seemingly redundant
 regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
 regressRegGrouping <- 'pool'                # options are: "H12", "H21", "country", "pool"
-consData <- 'mcc'                           # options are: gcd (9 sectors), eurostat(3 sectors), mcc(only estimates)
+consData <- 'mcc'                           # options are: gcd, mcc
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
 micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of yet; 
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-MCCjoint-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-MCCJoint-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -112,29 +112,20 @@ data = prepare_modelData(all_paths,isExport = T) %>%
 load("RESCUE.RData")
 
 
-if(consData == 'gcd'){
-  
-  coef = analyze_regression(regressModel = regressModel, 
-                            consData = consData, 
-                            regressRegGrouping = regressRegGrouping,
-                            prune = T,
-                            isDisplay = TRUE, isExport = T)
-  
-  #Write a fill function, t integrate the filling procedure here
-} else if(consData == 'mcc') {
-  
-  coef = get_estimateMcc(regressRegGrouping = regressRegGrouping)
-  
-}
+#Engel curve estimation
+coef <- analyze_regression(regressModel = regressModel,
+                          consData = consData,
+                          regressRegGrouping = regressRegGrouping,
+                          allCoef = FALSE,
+                          isDisplay = TRUE,
+                          isExport = FALSE,
+                          export_path = NULL,
+                          # optional MCC cleaning:
+                          mcc_sum_share_range = c(0.85,1.05)) 
+#Todo: regiona estimates are incomplete, fix before use
 
-#uses gcd regional results, there are missing data for developed world. 
-#I wanted to use EUR for other developed world but found that EUR has only 
-#limited observations too, so this is not a good strategy
 
-# missingMapping <- data.frame(
-#   missing = c('CAZ', 'JPN', 'USA'),
-#   replaceWith = c('EUR', 'EUR', 'EUR'))
-
+#Todo: intercept term is useless, remove it
 decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regressModel, 
                                            isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
 

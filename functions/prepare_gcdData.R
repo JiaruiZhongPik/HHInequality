@@ -9,6 +9,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
            sector =`harmonized sector` 
            )
   
+  
   # Read in regional mapping 
   regionmappingH12 <- read_delim("input/regionmappingH12.csv", 
                                  delim = ";", escape_double = FALSE, trim_ws = TRUE,
@@ -25,7 +26,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
   dfRaw <- read_excel("input/WB_GCD_2010_v2014-03_data.xlsx", 
                       col_types = c("text", "text", "skip", 
                                     "skip", "skip", "skip", "skip", "numeric", 
-                                    "text", "text", "skip", "skip", "skip", 
+                                    "text", "text", "skip", "text", "text", 
                                     "text", "text", "text", "numeric"))%>%
     rename(geo = Countrycode,
            countryname = Countryname,
@@ -34,6 +35,8 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
            unit = Measurementunit,
            area = Area,
            coicop = Labelofproductorservice,
+           sex= Sex,
+           ageGroup = Agegroup,
            incomegroup = Incomegroup,
            value = Value)
   
@@ -97,19 +100,32 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
       !is.na(value),
       !countryname %in% setdiff(dpCountryName, c('Brazil', 'India', 'South Africa'))
     ) %>%
-    select( -area, - countryname, -coicop) %>%
+    select( -area, - countryname, -coicop, -sex, -ageGroup) %>%
     GDPuc::convertGDP(unit_in = "constant 2010 US$MER", 
                       unit_out = "constant 2017 US$MER",
                       verbose = F) %>%
     mutate(unit='constant 2017 US$MER') 
     
-    
-    dfFinal <- dfExp %>%
-    bind_rows(dfH) 
+  #get population size data
+  dfPop <- dfRaw %>% filter(
+    variable == 'Population',
+    unit == '% in country',
+    area == 'National',
+    ageGroup == 'All',
+    sex =='Both',
+    incomegroup != 'All',
+    !is.na(value),
+    !(countryname %in% setdiff(dpCountryName, c('Brazil', 'India', 'South Africa')))
+  ) %>%
+    mutate(variable ='popShare') %>%
+    distinct() %>%
+    select(-area, -countryname, -coicop, -sex, -ageGroup)
+
+  dfFinal <- bind_rows(dfH,dfPop,dfExp)
+  
   
   
   #Visualize country coverage of database
-  
   
   # Step 1: Load world map
   world <- ne_countries(scale = "medium", returnclass = "sf")

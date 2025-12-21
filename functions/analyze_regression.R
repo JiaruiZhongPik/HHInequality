@@ -1,287 +1,283 @@
-#----This function conducts regression with Eurostat consumption data----------
+#----This function conducts the regression analysis on Engel Curves, optionally
+#on mcc or gcd dataset.
 
 
-analyze_regression <- function (regressModel = 'logitTransOLS', consData ='gcd', 
-                                regressRegGrouping = 'pool',
-                                prune = T,
-                                isDisplay = TRUE, isExport = FALSE) {
+analyze_regression <- function(regressModel = "logitTransOLS",
+                               consData = c("gcd", "mcc"),
+                               regressRegGrouping = "pool",
+                               allCoef = FALSE,
+                               isDisplay = TRUE,
+                               isExport = FALSE,
+                               export_path = NULL,
+                               # optional MCC cleaning:
+                               mcc_sum_share_range = c(0.85,1.05)) {
   
-  # Read in regional mapping   
-  if(regressRegGrouping =='H12') {
-    
-    regionMapping<- read_delim("input/regionmappingH12.csv", 
-                               delim = ";", escape_double = FALSE, col_types = cols(X = col_skip()), 
-                               trim_ws = TRUE,
-                               show_col_types = FALSE) %>%
-      rename(geo = CountryCode,
-             region = RegionCode) 
-  } else if (regressRegGrouping == 'H21') {
-    
-    regionMapping <- read_delim("input/regionmapping_21_EU11.csv", 
-                                    delim = ";", escape_double = FALSE, col_types = cols(X = col_skip(), 
-                                                                                         missingH12 = col_skip()), 
-                                    trim_ws = TRUE,
-                                    show_col_types = FALSE) %>%
-      rename(geo = CountryCode,
-             region = RegionCode)
+  consData <- match.arg(consData)
+  
+  regionMapping <- if (regressRegGrouping %in% c("H12", "H21")) {
+    load_region_mapping(regressRegGrouping)
+  } else {
+    NULL
   }
   
-
-  
-  if (consData == 'eurostat'){
-    
-    # Note: The Eurostat database contains consumption data for 5 income quintiles
-    # across 33 European countries. The consumption basket is split into three
-    # categories: energy, food, and other commodities. This dataset is only used
-    # at an early stage, when global data is not yet available, and is not used
-    # in the final analysis.
-    
-    warning("The Eurostat database contains only data for EU countries and should be used with caution.")
-    
-    hhConsData <- prepare_eurostatData()
-    
-    if( regressModel == 'polynomialLM'){
-      
-      modelFoodFe = lm(wFood ~ log(exp) + I(log(exp)^2)  + geo + TIME_PERIOD , hhConsData )
-      
-      modelEneFe = lm(wEnergy ~ log(exp) + I(log(exp)^2) + geo + TIME_PERIOD , hhConsData )
-      
-      modelCommFe = lm(wCommodity ~ log(exp) + I(log(exp)^2) + geo + TIME_PERIOD , hhConsData )
-      
-      
-    } else if (regressModel =='logitTransOLS') {
-      
-      #Prepare data:clip data to stay strictly between 0 and 1, which is required for logit transformation 
-      hhConsData<- hhConsData %>%
-        mutate(wFoodClipped = pmin(pmax(wFood, 1e-4), 1 - 1e-4),
-               wFoodLogitShare = log(wFoodClipped / (1 - wFoodClipped)),
-               
-               wEneClipped = pmin(pmax(wEnergy, 1e-4), 1 - 1e-4),
-               wEneLogitShare = log(wEneClipped / (1 - wEneClipped)),
-               
-               wCommClipped = pmin(pmax(wCommodity, 1e-4), 1 - 1e-4),
-               wCommLogitShare = log(wCommClipped / (1 - wCommClipped)),
-        )
-      
-      #Regression model
-      modelFoodFe <- lm(wFoodLogitShare ~ log(exp) + I(log(exp)^2)  + factor(geo) + factor(TIME_PERIOD), data = hhConsData)
-      
-      modelEneFe <- lm(wEneLogitShare ~ log(exp) + I(log(exp)^2)  + factor(geo) + factor(TIME_PERIOD), data = hhConsData)
-      
-      modelCommFe <- lm(wCommLogitShare ~ log(exp) + I(log(exp)^2)  + factor(geo) + factor(TIME_PERIOD), data = hhConsData)
-      
-    }
-    
-
-    coef = data.frame(
-      Food = modelFoodFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')],
-      Energy = modelEneFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')],
-      Commodity = modelCommFe$coefficients[c('(Intercept)','log(exp)','I(log(exp)^2)')]
-     ) %>%
-      rownames_to_column(var = 'regressor') %>%
-      pivot_longer(cols = c('Food','Energy','Commodity'), names_to = 'sector', values_to = 'value') %>%
-      mutate(region = 'pool')
-    
-    if(isDisplay){
-      stargazer(modelFoodFe, modelEneFe, modelCommFe, 
-                type = "text",
-                title = "Regression Results",
-                dep.var.labels = c("Share:Food", "Share:Energy", "Share:Commodities"),
-                digits = 3,
-                keep = c('Constant','exp'))
-    }
-  } else if (consData == 'gcd'){
-    
-    #Note: GCD: https://datatopics.worldbank.org/consumption/Aboutdatabase
-    # GCD is a one-stop data source on household consumption patterns in developing countries.
-    # Coverage for developed countries is very sparse.
-    
-    #GCD data
-    dfRaw <- prepare_gcdData(isDisplay,isExport)
-
-    #Population data
-    pop <- calcOutput("Population",aggregate = F, scenario = 'SSP1', year = 2010, round = 8) %>%
-      as.data.frame() %>% 
-      select(-Cell, -Data1) %>%
-      mutate(Year = 2010) %>%
-      rename(geo = Region,
-             pop = Value,
-             year = Year)
-    
-    #Combine consumption and population data
-    hhConsData <- dfRaw %>%
-      select(-unit) %>%
-      pivot_wider(names_from = variable, values_from = value) %>%
-      left_join(pop, by=c('geo', 'year'))
-    
-    #Add regional grouping tag
-    if (regressRegGrouping == 'country'){
-      hhConsData <- hhConsData %>%
-        mutate(region = geo)
-    } else if (regressRegGrouping =='pool'){
-      hhConsData <- hhConsData %>%
-        mutate(region = 'pool')
-    } else {
-      hhConsData <- hhConsData %>%
-        merge(regionMapping,  by= 'geo')
-    }
-    
-    #Identify share columns
-    share_cols <- colnames(hhConsData)[grepl("^share\\|", colnames(hhConsData))]
-    
-    #Nest data by regional tag
-    nested_data <- hhConsData %>%
-      group_by(region) %>%
-      group_split()
-    
-    # Count the number of observations for inspection
-    obCount <- hhConsData %>%
-      group_by(region) %>%
-      summarise(row_count = n())
-    
-    print(obCount)
-    
-    if (regressModel == 'polynomialLM' ){
-      
-      # polynomialLM: quadratic polynomial linear regression model.
-      # This functional form can imply negative consumption shares at higher
-      # future expenditure levels and is therefore no longer used.
-      
-      warning("This functional form may yield negative future consumption shares. Use with caution.")
-      
-      # run the regression first mappping over region and then mapping over sector
-      results <- map(nested_data, function(region_df) {
-        
-        region_name <- unique(region_df$region)
-        
-        region_df <- region_df %>% mutate(geo = as.factor(geo))
-        
-        map(share_cols, function(col) {
-          
-          # Add regional fixed effects when multiple regions are present
-          if (nlevels(region_df$geo) < 2) {
-            formula <- as.formula(paste0("`", col, "` ~ log(exp) + I(log(exp)^2)"))
-          } else {
-            formula <- as.formula(paste0("`", col, "` ~ log(exp) + I(log(exp)^2) + geo"))
-          }
-          
-          model <- lm(formula, data = region_df, weights = pop)
-          
-          tidy(model) %>%
-            mutate(share = col, region = region_name)
-        }) %>%
-          bind_rows()
-      }
-      )
-      
-      # combine all results
-      coef <- bind_rows(results) %>%
-        filter(term %in% c("(Intercept)", "log(exp)", "I(log(exp)^2)")) %>%
-        select(region, share, term, estimate) %>%
-        rename(
-          sector = share,
-          regressor = term,
-          value = estimate
-        )%>%
-        mutate(sector = str_remove(sector, "^share\\|"))
-      
-      
-    } else if (regressModel == 'logitTransOLS') {
-      
-      results_logit <- map(nested_data, function(region_df) {
-        
-        region_name <- unique(region_df$region)
-        region_df <- region_df %>% mutate(geo = as.factor(geo))
-        
-        # run the regression first mappping over region and then mapping over sector
-        map(share_cols, function(col) {
-          
-          # clipping and logit transform to the dependent variable
-          y_clipped <- pmin(pmax(region_df[[col]], 1e-4), 1 - 1e-4)
-          region_df$y_logit <- log(y_clipped / (1 - y_clipped))  # logit transform
-          
-          # Add regional fixed effects when multiple regions are present
-          if (nlevels(region_df$geo) < 2) {
-            formula <- y_logit ~ log(exp) + I(log(exp)^2)
-          } else {
-            formula <- y_logit ~ log(exp) + I(log(exp)^2) + geo
-          }
-          
-          # Fit model
-          model <- lm(formula, data = region_df, weights = pop)
-          
-          tidy(model) %>%
-            mutate(share = col, region = region_name)
-        }) %>%
-          bind_rows()
-      })
-      
-      coef_export <- bind_rows(results_logit) %>% filter(term %in% c("(Intercept)",'log(exp)',"I(log(exp)^2)"))
-      
-      if(isExport == T){
-        write.csv(coef_export, paste0("output/gcd_estimates_",regressRegGrouping,".csv"), row.names = FALSE)
-      }
-      
-      if(prune == F){
-        coef_proned <- bind_rows(results_logit) %>%
-          filter(term %in% c("(Intercept)", "log(exp)", "I(log(exp)^2)")) %>%
-          select(region, share, term, estimate) %>%
-          rename(
-            sector = share,
-            regressor = term,
-            value = estimate
-          ) %>%
-          mutate(sector = str_remove(sector, "^share\\|"))
-      } else if(prune == T){
-        
-        coef_proned <- bind_rows(results_logit) %>%
-          filter(term %in% c("(Intercept)", "log(exp)", "I(log(exp)^2)")) %>%
-          select(region, share, term, estimate, p.value) %>%
-          mutate(
-            estimate = if_else(p.value > 0.1, 0, estimate)
-          ) %>%
-          select(-p.value) %>%
-          rename(
-            sector = share,
-            regressor = term,
-            value = estimate
-          ) %>%
-          mutate(sector = str_remove(sector, "^share\\|"))
-
-        
-      }
-
-      
-    }
-  
-    # Check whether all regions are present
-    # Issue a warning if any region is missing in the H12/H21 case
-    
-    if (regressRegGrouping %in% c('H12','H21')){
-      
-      missing_countries <- setdiff(unique(regionMapping$region), unique(coef$region))
-      
-      if ( length(missing_countries) > 0) {
-        
-        warning("⚠️ The following countries are missing from the data:\n", 
-                paste(missing_countries, collapse = ", "))
-      
-        } else {
-        
-        message("REMIND regions are complete")
-      
-          }
-    }
-    
-    
-
-    
-    
+  hh <- if (consData == "gcd") {
+    prep_gcd(isDisplay = isDisplay, isExport = isExport)
+  } else {
+    prep_mcc(sum_share_range = mcc_sum_share_range)
   }
-
   
-  return(coef_proned)
+  hh <- add_region_tag(hh, regressRegGrouping, regionMapping)
+  
+  out <- estimate_engel_core(
+    hh = hh,
+    regressModel = regressModel,
+    eps = 1e-6,
+    add_country_fe = TRUE,
+    allCoef = allCoef
+  )
+  
+  if (isDisplay) print(out$obCount)
+  
+  if (isExport) {
+    if (is.null(export_path)) {
+      export_path <- paste0("output/", consData, "_estimates_", regressRegGrouping, ".csv")
+    }
+    dir.create(dirname(export_path), recursive = TRUE, showWarnings = FALSE)
+    readr::write_csv(out$coef_all, export_path)
+  }
+  
+  out$coef
 }
 
 
-#-------------------------Data coverage check-----------------------------------
+#helper 1: region mapping helper
+load_region_mapping <- function(regressRegGrouping) {
+  if (regressRegGrouping == "H12") {
+    readr::read_delim(
+      "input/regionmappingH12.csv",
+      delim = ";",
+      escape_double = FALSE,
+      col_types = readr::cols(X = readr::col_skip()),
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    ) %>%
+      dplyr::rename(geo = CountryCode, region = RegionCode)
+    
+  } else if (regressRegGrouping == "H21") {
+    readr::read_delim(
+      "input/regionmapping_21_EU11.csv",
+      delim = ";",
+      escape_double = FALSE,
+      col_types = readr::cols(X = readr::col_skip(), missingH12 = readr::col_skip()),
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    ) %>%
+      dplyr::rename(geo = CountryCode, region = RegionCode)
+    
+  } else {
+    NULL
+  }
+}
+
+add_region_tag <- function(df, regressRegGrouping, regionMapping = NULL) {
+  if (regressRegGrouping == "country") {
+    df %>% dplyr::mutate(region = geo)
+  } else if (regressRegGrouping == "pool") {
+    df %>% dplyr::mutate(region = "pool")
+  } else {
+    if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
+    df %>% dplyr::left_join(regionMapping, by = "geo")
+  }
+}
+
+
+#Helper2: dataset prep adapters
+prep_gcd <- function(isDisplay = FALSE, isExport = FALSE) {
+  # prepare_gcdData must return long format:
+  # geo, year, incomegroup, variable, value, unit(optional), popShare/pop
+  df_long <- prepare_gcdData(isDisplay, isExport) %>%
+    dplyr::select(-dplyr::any_of("unit"))
+  
+  # force unique keys BEFORE pivot_wider (prevents list-cols)
+  df_wide <- df_long %>%
+    dplyr::group_by(geo, year, incomegroup, variable) %>%
+    dplyr::summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+    tidyr::pivot_wider(names_from = variable, values_from = value)
+  
+  # unify weight naming
+  if ("popShare" %in% names(df_wide)) {
+    df_wide <- df_wide %>% dplyr::mutate(weight = popShare)
+  } else if ("pop" %in% names(df_wide)) {
+    df_wide <- df_wide %>% dplyr::mutate(weight = pop)
+  } else {
+    stop("GCD data has neither popShare nor pop. Add a weight column.")
+  }
+  
+  df_wide
+}
+
+
+prep_mcc <- function(path = "input/MCC Data Output Deciles.csv",
+                     sum_share_range = c(0.85, 1.05), 
+                     eps = 1e-12) {
+  # Requirements: readr, dplyr, countrycode, stringr (optional)
+  
+  goods_cols <- c(
+    "fruits", "animal", "other_food", "transport",
+    "other_fuels", "goods", "gas", "electricity", "staple"
+  )
+  
+  # 1) Read
+  df_raw <- readr::read_csv(path, show_col_types = FALSE)
+  
+  # 2) Basic column checks (fail fast, not mysteriously)
+  need <- c("Country", "Income_Group_10", "expenditures_USD_2017", "hh_weights", goods_cols)
+  miss <- setdiff(need, names(df_raw))
+  if (length(miss) > 0) {
+    stop("prep_mcc(): missing columns in input CSV: ", paste(miss, collapse = ", "))
+  }
+  
+  # 3) Reverse logit -> shares in (0,1)
+  df_unlogit <- df_raw %>%
+    dplyr::mutate(dplyr::across(dplyr::all_of(goods_cols), ~ plogis(.x)))
+  
+  # 4) Harmonize to GCD-style schema
+  df <- df_unlogit %>%
+    dplyr::transmute(
+      country_name = Country,
+      geo = countrycode::countrycode(country_name, origin = "country.name", destination = "iso3c"),
+      incomegroup = as.character(Income_Group_10),     # deciles 1..10 but keep as character like GCD
+      exp = as.numeric(expenditures_USD_2017),
+      pop = as.numeric(hh_weights),
+      weight = as.numeric(hh_weights),                # unified weight column
+      
+      `share|Animal products`        = as.numeric(animal),
+      `share|Building electricity`   = as.numeric(electricity),
+      `share|Empty calories`         = as.numeric(other_food),
+      `share|Transport energy`       = as.numeric(transport),
+      `share|Fruits vegetables nuts` = as.numeric(fruits),
+      `share|Building gases`         = as.numeric(gas),
+      `share|Building other fuels`   = as.numeric(other_fuels),
+      `share|Other commodities`      = as.numeric(goods),
+      `share|Staples`                = as.numeric(staple)
+    )
+  
+  # 5) Drop failed ISO3 matches (or keep and warn)
+  n_bad_iso <- sum(is.na(df$geo) | df$geo == "", na.rm = TRUE)
+  if (n_bad_iso > 0) {
+    warning("prep_mcc(): ", n_bad_iso, " rows have missing ISO3 (geo) after countrycode(). Dropping them.")
+    df <- df %>% dplyr::filter(!is.na(geo), geo != "")
+  }
+  
+  # 6) Optional: filter by sum of shares (closure check)
+  share_cols <- names(df)[grepl("^share\\|", names(df))]
+  df <- df %>%
+    dplyr::mutate(sum_share = rowSums(dplyr::across(dplyr::all_of(share_cols)), na.rm = TRUE))
+  
+  if (!is.null(sum_share_range)) {
+    stopifnot(length(sum_share_range) == 2)
+    df <- df %>%
+      dplyr::filter(sum_share >= sum_share_range[1] - eps,
+                    sum_share <= sum_share_range[2] + eps)
+  }
+  
+
+   df <- df %>% dplyr::select(-country_name)
+  
+  df
+}
+
+#Helper3: the shared regression engine
+
+estimate_engel_core <- function(hh,
+                                regressModel = c("logitTransOLS", "polynomialLM"),
+                                eps = 1e-6,
+                                add_country_fe = TRUE,
+                                allCoef = FALSE) {
+  
+  regressModel <- match.arg(regressModel)
+  
+  # identify share columns
+  share_cols <- names(hh)[grepl("^share\\|", names(hh))]
+  if (length(share_cols) == 0) stop("No share| columns found.")
+  
+  # basic sanity checks
+  need_cols <- c("geo", "region", "exp", "weight")
+  miss <- setdiff(need_cols, names(hh))
+  if (length(miss) > 0) stop("Missing required columns: ", paste(miss, collapse = ", "))
+  
+  obCount <- hh %>%
+    dplyr::count(region, name = "row_count")
+  
+  nested_data <- hh %>%
+    dplyr::group_by(region) %>%
+    dplyr::group_split()
+  
+  results <- purrr::map(nested_data, function(region_df) {
+    region_name <- unique(region_df$region)
+    
+    region_df <- region_df %>%
+      dplyr::mutate(geo = as.factor(geo))
+    
+    purrr::map(share_cols, function(col) {
+      
+      df <- region_df %>%
+        dplyr::filter(!is.na(exp), exp > 0,
+                      !is.na(weight), weight > 0,
+                      !is.na(.data[[col]]),
+                      !is.na(geo))
+      
+      if (nrow(df) < 5) {
+        return(tibble::tibble(term = character(), estimate = numeric(), std.error = numeric(),
+                              share = col, region = region_name))
+      }
+      
+      fe_ok <- add_country_fe && dplyr::n_distinct(df$geo) >= 2
+      
+      if (regressModel == "polynomialLM") {
+        rhs <- "log(exp) + I(log(exp)^2)"
+        if (fe_ok) rhs <- paste(rhs, "+ geo")
+        fml <- stats::as.formula(paste0("`", col, "` ~ ", rhs))
+        
+        fit <- stats::lm(fml, data = df, weights = df$weight)
+        
+      } else {
+        # logitTransOLS
+        y_clip <- pmin(pmax(df[[col]], eps), 1 - eps)
+        df$y_logit <- qlogis(y_clip)
+        
+        rhs <- "log(exp) + I(log(exp)^2)"
+        if (fe_ok) rhs <- paste(rhs, "+ geo")
+        fml <- stats::as.formula(paste0("y_logit ~ ", rhs))
+        
+        fit <- stats::lm(fml, data = df, weights = df$weight)
+      }
+      
+      broom::tidy(fit) %>%
+        dplyr::mutate(share = col, region = region_name)
+    }) %>%
+      dplyr::bind_rows()
+  }) %>%
+    dplyr::bind_rows()
+  
+  coef_all <- results %>%
+    dplyr::mutate(
+      sector = stringr::str_remove(share, "^share\\|"),
+      regressor = term,
+      value = estimate,
+      se = std.error
+    ) %>%
+    dplyr::select(region, sector, regressor, value, se)
+  
+  coef_main <- coef_all %>%
+    dplyr::filter(regressor %in% c("(Intercept)", "log(exp)", "I(log(exp)^2)")) %>%
+    dplyr::select(-se)
+  
+  if (!allCoef) coef_all <- coef_main
+  
+  list(
+    coef = coef_main,
+    coef_all = coef_all,
+    obCount = obCount
+  )
+}
