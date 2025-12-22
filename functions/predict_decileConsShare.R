@@ -170,41 +170,41 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
           ) %>%
-          mutate( `fixedEff|Building gases` =  `share|Building gases` - `Building gases|(Intercept)`-
+          mutate( `fixedEff+intercept|Building gases` =  `share|Building gases` -
                     `Building gases|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Building gases|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Building electricity` = `share|Building electricity` - `Building electricity|(Intercept)`-
+                  `fixedEff+intercept|Building electricity` = `share|Building electricity` -
                     `Building electricity|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Building electricity|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Building other fuels` = `share|Building other fuels` - `Building other fuels|(Intercept)`-
+                  `fixedEff+intercept|Building other fuels` = `share|Building other fuels`-
                     `Building other fuels|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Building other fuels|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Transport energy` = `share|Transport energy` - `Transport energy|(Intercept)`-
+                  `fixedEff+intercept|Transport energy` = `share|Transport energy` -
                     `Transport energy|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Transport energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Animal products` =  `share|Animal products`  - `Animal products|(Intercept)`-
+                  `fixedEff+intercept|Animal products` =  `share|Animal products` -
                     `Animal products|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Animal products|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Staples` =  `share|Staples`  - `Staples|(Intercept)`-
+                  `fixedEff+intercept|Staples` =  `share|Staples`  -
                     `Animal products|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Animal products|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Fruits vegetables nuts` =  `share|Fruits vegetables nuts`  - `Fruits vegetables nuts|(Intercept)`-
+                  `fixedEff+intercept|Fruits vegetables nuts` =  `share|Fruits vegetables nuts` -
                     `Fruits vegetables nuts|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Fruits vegetables nuts|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                   
-                  `fixedEff|Empty calories` =  `share|Empty calories`  - `Empty calories|(Intercept)`-
+                  `fixedEff+intercept|Empty calories` =  `share|Empty calories` -
                     `Empty calories|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Empty calories|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2
 
               
           ) %>%
-          select(scenario, model, region, period, starts_with("fixedEff|"))
+          select(scenario, model, region, period, starts_with("fixedEff+intercept|"))
         
         
 
@@ -220,37 +220,29 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
           ) %>%
-          mutate( `share|Building gases` = `Building gases|(Intercept)` + 
-                    `Building gases|log(exp)` * log(consumptionCa) +
-                    `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building gases`,
+          mutate( `share|Building gases` = `Building gases|log(exp)` * log(consumptionCa) +
+                    `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building gases`,
                   
-                  `share|Building electricity` = `Building electricity|(Intercept)` + 
-                    `Building electricity|log(exp)` * log(consumptionCa) +
-                    `Building electricity|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building electricity`,
+                  `share|Building electricity` = `Building electricity|log(exp)` * log(consumptionCa) +
+                    `Building electricity|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building electricity`,
                   
-                  `share|Building other fuels` = `Building other fuels|(Intercept)` + 
-                    `Building other fuels|log(exp)` * log(consumptionCa) +
-                    `Building other fuels|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building other fuels`,
+                  `share|Building other fuels` = `Building other fuels|log(exp)` * log(consumptionCa) +
+                    `Building other fuels|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building other fuels`,
                   
-                  `share|Transport energy` = `Transport energy|(Intercept)` + 
-                    `Transport energy|log(exp)` * log(consumptionCa) +
-                    `Transport energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Transport energy`,
+                  `share|Transport energy` = `Transport energy|log(exp)` * log(consumptionCa) +
+                    `Transport energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Transport energy`,
                   
-                  `share|Staples` = `Staples|(Intercept)` + 
-                    `Staples|log(exp)` * log(consumptionCa) +
-                    `Staples|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Staples`,
+                  `share|Staples` = `Staples|log(exp)` * log(consumptionCa) +
+                    `Staples|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Staples`,
                   
-                  `share|Animal products` = `Animal products|(Intercept)` + 
-                    `Animal products|log(exp)` * log(consumptionCa) +
-                    `Animal products|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Animal products`,
+                  `share|Animal products` = `Animal products|log(exp)` * log(consumptionCa) +
+                    `Animal products|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Animal products`,
                   
-                  `share|Fruits vegetables nuts` = `Fruits vegetables nuts|(Intercept)` + 
-                    `Fruits vegetables nuts|log(exp)` * log(consumptionCa) +
-                    `Fruits vegetables nuts|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Fruits vegetables nuts`   ,
+                  `share|Fruits vegetables nuts` = `Fruits vegetables nuts|log(exp)` * log(consumptionCa) +
+                    `Fruits vegetables nuts|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Fruits vegetables nuts`   ,
                   
-                  `share|Empty calories` = `Empty calories|(Intercept)` + 
-                    `Empty calories|log(exp)` * log(consumptionCa) +
-                    `Empty calories|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Empty calories`,
+                  `share|Empty calories` = `Empty calories|log(exp)` * log(consumptionCa) +
+                    `Empty calories|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Empty calories`,
                   
                   `share|Other commodities` = 1-`share|Building gases`-`share|Building electricity`-`share|Building other fuels`- `share|Transport energy`
                   -`share|Staples`-`share|Animal products`-`share|Fruits vegetables nuts`-`share|Empty calories`
@@ -273,7 +265,7 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
             pivot_wider(names_from = variable, values_from = value),
           by = c("scenario", "period", "region")
         ) %>%
-        mutate( `fixedEff|Energy` = `FEShare|Household` - `Energy|(Intercept)`-
+        mutate( `fixedEff+intercept|Energy` = `FEShare|Household`-
                   `Energy|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2) %>%
         select(scenario, model, region, period, starts_with("fixedEff|"))
@@ -289,12 +281,10 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
             pivot_wider(names_from = variable, values_from = value),
           by = c("scenario", "period", "region")
         ) %>%
-        mutate( `share|Energy` = `Energy|(Intercept)` + 
-                  `Energy|log(exp)` * log(consumptionCa) +
-                  `Energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Energy`,
+        mutate( `share|Energy` = `Energy|log(exp)` * log(consumptionCa) +
+                  `Energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Energy`,
                 
-                `share|Food` = `Food|(Intercept)` + 
-                  `Food|log(exp)` * log(consumptionCa) +
+                `share|Food` = `Food|log(exp)` * log(consumptionCa) +
                   `Food|I(log(exp)^2)`  * log(consumptionCa) ^ 2, # todo: add fixed effects for food
                 
                 `share|Other commodities` = 1-`share|Energy`-`share|Food`
@@ -331,41 +321,41 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
             pivot_wider(names_from = variable, values_from = value),
           by = c("scenario", "period", "region")
         ) %>%
-        mutate( `fixedEff|Building gases` =  log(`share|Building gases`/(1-`share|Building gases`)) - `Building gases|(Intercept)`-
+        mutate( `fixedEff+intercept|Building gases` =  log(`share|Building gases`/(1-`share|Building gases`))-
                   `Building gases|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Building gases|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Building electricity` = log(`share|Building electricity`/(1-`share|Building electricity`)) - `Building electricity|(Intercept)`-
+                `fixedEff+intercept|Building electricity` = log(`share|Building electricity`/(1-`share|Building electricity`)) -
                   `Building electricity|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Building electricity|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Building other fuels` = log(`share|Building other fuels`/(1-`share|Building other fuels`)) - `Building other fuels|(Intercept)`-
+                `fixedEff+intercept|Building other fuels` = log(`share|Building other fuels`/(1-`share|Building other fuels`)) -
                   `Building other fuels|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Building other fuels|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Transport energy` = log(`share|Transport energy`/(1-`share|Transport energy`)) - `Transport energy|(Intercept)`-
+                `fixedEff+intercept|Transport energy` = log(`share|Transport energy`/(1-`share|Transport energy`)) -
                   `Transport energy|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Transport energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Animal products` = log(`share|Animal products`/(1-`share|Animal products`)) - `Animal products|(Intercept)`-
+                `fixedEff+intercept|Animal products` = log(`share|Animal products`/(1-`share|Animal products`)) -
                   `Animal products|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Animal products|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Staples` = log(`share|Staples`/(1-`share|Staples`)) - `Staples|(Intercept)`-
+                `fixedEff+intercept|Staples` = log(`share|Staples`/(1-`share|Staples`)) -
                   `Staples|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Staples|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Fruits vegetables nuts` = log(`share|Fruits vegetables nuts`/(1-`share|Fruits vegetables nuts`)) - `Fruits vegetables nuts|(Intercept)`-
+                `fixedEff+intercept|Fruits vegetables nuts` = log(`share|Fruits vegetables nuts`/(1-`share|Fruits vegetables nuts`)) -
                   `Fruits vegetables nuts|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Fruits vegetables nuts|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
-                `fixedEff|Empty calories` = log(`share|Empty calories`/(1-`share|Empty calories`)) - `Empty calories|(Intercept)`-
+                `fixedEff+intercept|Empty calories` = log(`share|Empty calories`/(1-`share|Empty calories`)) -
                   `Empty calories|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                   `Empty calories|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2,
                 
                 
         ) %>%
-        select(scenario, model, region, period, starts_with("fixedEff|"))
+        select(scenario, model, region, period, starts_with("fixedEff+intercept|"))
       
       
       #Compute decile-specific energy budget share  
@@ -381,37 +371,29 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
             pivot_wider(names_from = variable, values_from = value),
           by = c("scenario", "period", "region")
         ) %>%
-        mutate( `shareLogit|Building gases` = `Building gases|(Intercept)` + 
-                  `Building gases|log(exp)` * log(consumptionCa) +
-                  `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building gases`,
+        mutate( `shareLogit|Building gases` = `Building gases|log(exp)` * log(consumptionCa) +
+                  `Building gases|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building gases`,
                 
-                `shareLogit|Building electricity` = `Building electricity|(Intercept)` + 
-                  `Building electricity|log(exp)` * log(consumptionCa) +
-                  `Building electricity|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building electricity`,
+                `shareLogit|Building electricity` = `Building electricity|log(exp)` * log(consumptionCa) +
+                  `Building electricity|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building electricity`,
                 
-                `shareLogit|Building other fuels` = `Building other fuels|(Intercept)` + 
-                  `Building other fuels|log(exp)` * log(consumptionCa) +
-                  `Building other fuels|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Building other fuels`,
+                `shareLogit|Building other fuels` = `Building other fuels|log(exp)` * log(consumptionCa) +
+                  `Building other fuels|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Building other fuels`,
                 
-                `shareLogit|Transport energy` = `Transport energy|(Intercept)` + 
-                  `Transport energy|log(exp)` * log(consumptionCa) +
-                  `Transport energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Transport energy`,
+                `shareLogit|Transport energy` =  `Transport energy|log(exp)` * log(consumptionCa) +
+                  `Transport energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Transport energy`,
                 
-                `shareLogit|Staples` = `Staples|(Intercept)` + 
-                  `Staples|log(exp)` * log(consumptionCa) +
-                  `Staples|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Staples`,
+                `shareLogit|Staples` =  `Staples|log(exp)` * log(consumptionCa) +
+                  `Staples|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Staples`,
                 
-                `shareLogit|Animal products` = `Animal products|(Intercept)` + 
-                  `Animal products|log(exp)` * log(consumptionCa) +
-                  `Animal products|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Animal products`,
+                `shareLogit|Animal products` = `Animal products|log(exp)` * log(consumptionCa) +
+                  `Animal products|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Animal products`,
                 
-                `shareLogit|Fruits vegetables nuts` = `Fruits vegetables nuts|(Intercept)` + 
-                  `Fruits vegetables nuts|log(exp)` * log(consumptionCa) +
-                  `Fruits vegetables nuts|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Fruits vegetables nuts`,   
+                `shareLogit|Fruits vegetables nuts` = `Fruits vegetables nuts|log(exp)` * log(consumptionCa) +
+                  `Fruits vegetables nuts|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Fruits vegetables nuts`,   
                 
-                `shareLogit|Empty calories` = `Empty calories|(Intercept)` + 
-                  `Empty calories|log(exp)` * log(consumptionCa) +
-                  `Empty calories|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff|Empty calories`,
+                `shareLogit|Empty calories` = `Empty calories|log(exp)` * log(consumptionCa) +
+                  `Empty calories|I(log(exp)^2)`  * log(consumptionCa) ^ 2 + `fixedEff+intercept|Empty calories`,
                 
                 `share|Building gases` = 1 / (1 + exp(-`shareLogit|Building gases`)),
                 
@@ -449,7 +431,7 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
           ) %>%
-          mutate( `fixedEff|Energy` = log(`FEShare|Household`/(1-`FEShare|Household`)) - `Energy|(Intercept)`-
+          mutate( `fixedEff+intercept|Energy` = log(`FEShare|Household`/(1-`FEShare|Household`))-
                     `Energy|log(exp)` * log((Consumption* 1e9) / (Population * 1e6)) -
                     `Energy|I(log(exp)^2)` * log((Consumption* 1e9)/(Population * 1e6 ))^2) %>%
           select(scenario, model, region, period, starts_with("fixedEff|"))
@@ -464,12 +446,10 @@ predict_decileConsShare <- function(data, coef, gini_baseline, regression_model 
               pivot_wider(names_from = variable, values_from = value),
             by = c("scenario", "period", "region")
           ) %>%
-          mutate( `shareLogit|Energy` = `Energy|(Intercept)` + 
-                    `Energy|log(exp)` * log(consumptionCa) +
-                    `Energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff|Energy`,
+          mutate( `shareLogit|Energy` = `Energy|log(exp)` * log(consumptionCa) +
+                    `Energy|I(log(exp)^2)`  * log(consumptionCa) ^ 2+ `fixedEff+intercept|Energy`,
                   
-                  `shareLogit|Food` = `Food|(Intercept)` + 
-                    `Food|log(exp)` * log(consumptionCa) +
+                  `shareLogit|Food` = `Food|log(exp)` * log(consumptionCa) +
                     `Food|I(log(exp)^2)`  * log(consumptionCa) ^ 2, # todo: add fixed effects for food
                   
                   `share|Energy` = 1 / (1 + exp(-`shareLogit|Energy`)),

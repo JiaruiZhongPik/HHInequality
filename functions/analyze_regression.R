@@ -270,7 +270,7 @@ estimate_engel_core <- function(hh,
     dplyr::select(region, sector, regressor, value, se)
   
   coef_main <- coef_all %>%
-    dplyr::filter(regressor %in% c("(Intercept)", "log(exp)", "I(log(exp)^2)")) %>%
+    dplyr::filter(regressor %in% c("log(exp)", "I(log(exp)^2)")) %>%
     dplyr::select(-se)
   
   if (!allCoef) coef_all <- coef_main

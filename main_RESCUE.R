@@ -121,13 +121,14 @@ coef <- analyze_regression(regressModel = regressModel,
                           isExport = FALSE,
                           export_path = NULL,
                           # optional MCC cleaning:
-                          mcc_sum_share_range = c(0.85,1.05)) 
+                          mcc_sum_share_range = c(0.85,1.05))
 #Todo: regiona estimates are incomplete, fix before use
 
 
 #Todo: intercept term is useless, remove it
 decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regressModel, 
                                            isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
+
 
 
 #inspecting intermediate variables, particularly price shock and exposure
