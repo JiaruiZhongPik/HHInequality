@@ -1,6 +1,111 @@
 #----This function conducts the regression analysis on Engel Curves, optionally
 #on mcc or gcd dataset.
 
+get_engelCurveCoef <- function(
+    regressModel       = "logitTransOLS",
+    dataSource         = c("mcc", "gcd"),
+    regressRegGrouping = "H12",              # "pool" => pooled; otherwise => patched regional
+    mccSumShareRange   = c(0.85, 1.05),
+    
+    # patch rules (only used when regressRegGrouping != "pool")
+    patchChaFrom       = c("gcdRegional", "pooledSame", "mccPooled", "gcdPooled"),
+    patchJpnFrom       = c("pooledSame", "mccPooled", "gcdPooled"),
+    isDisplay          = FALSE
+) {
+  dataSource   <- match.arg(dataSource)
+  patchChaFrom <- match.arg(patchChaFrom)
+  patchJpnFrom <- match.arg(patchJpnFrom)
+  
+  # ---- helpers ----
+  assertShapeUnique <- function(coefTbl, name = "coefTbl") {
+    bad <- coefTbl %>%
+      dplyr::count(region, sector, regressor, name = "n") %>%
+      dplyr::filter(n != 1)
+    if (nrow(bad) > 0) {
+      print(bad)
+      stop(name, " has duplicates or missing terms for some (region, sector, regressor).")
+    }
+    invisible(TRUE)
+  }
+  
+  fetchCoef <- function(consData, grouping) {
+    # analyze_regression() is assumed to return a coef table when allCoef = FALSE
+    if (consData == "mcc") {
+      analyze_regression(
+        regressModel = regressModel,
+        consData = "mcc",
+        regressRegGrouping = grouping,
+        allCoef = FALSE,
+        isDisplay = isDisplay,
+        isExport = FALSE,
+        mcc_sum_share_range = mccSumShareRange
+      )
+    } else {
+      analyze_regression(
+        regressModel = regressModel,
+        consData = "gcd",
+        regressRegGrouping = grouping,
+        allCoef = FALSE,
+        isDisplay = isDisplay,
+        isExport = FALSE
+      )
+    }
+  }
+  
+  pooledSame <- function() fetchCoef(dataSource, "pool")
+  pooledMcc  <- function() fetchCoef("mcc", "pool")
+  pooledGcd  <- function() fetchCoef("gcd", "pool")
+  
+  regionalSame <- function() fetchCoef(dataSource, regressRegGrouping)
+  regionalGcd  <- function() fetchCoef("gcd", regressRegGrouping)
+  
+  # ============================
+  # Mode A: pooled
+  # ============================
+  if (identical(regressRegGrouping, "pool")) {
+    coef <- pooledSame()
+    assertShapeUnique(coef, paste0("pooled_", dataSource))
+    return(coef)
+  }
+  
+  # ============================
+  # Mode B: patched regional
+  # ============================
+  coefBase <- regionalSame()
+  
+  # CHA replacement
+  coefCha <- switch(
+    patchChaFrom,
+    gcdRegional = regionalGcd() %>% dplyr::filter(region == "CHA"),
+    pooledSame  = pooledSame()  %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "CHA"),
+    mccPooled   = pooledMcc()   %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "CHA"),
+    gcdPooled   = pooledGcd()   %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "CHA")
+  )
+  if (nrow(coefCha) == 0) stop("CHA patch produced 0 rows (patchChaFrom = ", patchChaFrom, ").")
+  
+  # JPN replacement (default: pooled throughout)
+  coefJpn <- switch(
+    patchJpnFrom,
+    pooledSame = pooledSame() %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "JPN"),
+    mccPooled  = pooledMcc()  %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "JPN"),
+    gcdPooled  = pooledGcd()  %>% dplyr::filter(region == "pool") %>% dplyr::mutate(region = "JPN")
+  )
+  if (nrow(coefJpn) == 0) stop("JPN patch produced 0 rows (patchJpnFrom = ", patchJpnFrom, ").")
+  
+  # Apply patches
+  coefPatched <- coefBase %>%
+    dplyr::filter(!region %in% c("CHA", "JPN")) %>%
+    dplyr::bind_rows(coefCha) %>%
+    dplyr::bind_rows(coefJpn) %>%
+    dplyr::arrange(region, sector, regressor)
+  
+  assertShapeUnique(coefPatched, "coefPatched")
+  coefPatched
+}
+
+
+
+
 
 analyze_regression <- function(regressModel = "logitTransOLS",
                                consData = c("gcd", "mcc"),
@@ -34,9 +139,7 @@ analyze_regression <- function(regressModel = "logitTransOLS",
     eps = 1e-6,
     add_country_fe = TRUE,
     allCoef = allCoef
-  )
-  
-  if (isDisplay) print(out$obCount)
+  )$coefShape
   
   if (isExport) {
     if (is.null(export_path)) {
@@ -46,7 +149,7 @@ analyze_regression <- function(regressModel = "logitTransOLS",
     readr::write_csv(out$coef_all, export_path)
   }
   
-  out$coef
+ out
 }
 
 
@@ -79,16 +182,7 @@ load_region_mapping <- function(regressRegGrouping) {
   }
 }
 
-add_region_tag <- function(df, regressRegGrouping, regionMapping = NULL) {
-  if (regressRegGrouping == "country") {
-    df %>% dplyr::mutate(region = geo)
-  } else if (regressRegGrouping == "pool") {
-    df %>% dplyr::mutate(region = "pool")
-  } else {
-    if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
-    df %>% dplyr::left_join(regionMapping, by = "geo")
-  }
-}
+
 
 
 #Helper2: dataset prep adapters
@@ -227,10 +321,10 @@ estimate_engel_core <- function(hh,
                       !is.na(.data[[col]]),
                       !is.na(geo))
       
-      if (nrow(df) < 5) {
-        return(tibble::tibble(term = character(), estimate = numeric(), std.error = numeric(),
-                              share = col, region = region_name))
-      }
+      # if (nrow(df) < 5) {
+      #   return(tibble::tibble(term = character(), estimate = numeric(), std.error = numeric(),
+      #                         share = col, region = region_name))
+      # }
       
       fe_ok <- add_country_fe && dplyr::n_distinct(df$geo) >= 2
       
@@ -269,15 +363,12 @@ estimate_engel_core <- function(hh,
     ) %>%
     dplyr::select(region, sector, regressor, value, se)
   
-  coef_main <- coef_all %>%
+  coef_shape <- coef_all %>%
     dplyr::filter(regressor %in% c("log(exp)", "I(log(exp)^2)")) %>%
     dplyr::select(-se)
   
-  if (!allCoef) coef_all <- coef_main
-  
-  list(
-    coef = coef_main,
-    coef_all = coef_all,
-    obCount = obCount
-  )
+  if (!allCoef) coef_all <- NULL 
+  list( coefShape = coef_shape, 
+        coefAll = coef_all, 
+        obCount = obCount)
 }

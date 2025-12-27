@@ -211,98 +211,82 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
 
   transferEpc <- compute_transfer(data1 = data1, data2 = data2, 
                                   climaFund = climaFund, fund_return_scale = fund_return_scale, 
-                                  payg = 1,
+                                  payg = payg,
                                   recycle ='epc')
   transferNeut <- compute_transfer(data1 = data1, data2 = data2, 
                                    climaFund = climaFund, fund_return_scale = fund_return_scale,
-                                   payg = 1,
+                                   payg = payg,
                                    recycle ='neut')
   
-    
+  # baseline + policy scenario set
+  baselineScenario <- paste0('C_',all_runscens,'-',reference_run_name)
+  policyRegex <- paste(all_budgets, collapse = "|")
+  
+  # consumption with Neut (your current assumption)
+  consNeut <- data2 %>%
+    dplyr::select(scenario, region, period, decileGroup, consumptionCa) %>%
+    dplyr::left_join(transferNeut, by = c("scenario","region","period","decileGroup")) %>%
+    dplyr::mutate(
+      transferNeut = dplyr::if_else(scenario == baselineScenario, 0, transferNeut),
+      consumptionPre = consumptionCa - transferNeut
+    )
+  
+  incomeEffect <- computeLogChangeVsBaseline(
+    df = consNeut,
+    value_col = consumptionPre,
+    baselineScenario = baselineScenario,
+    policyRegex = policyRegex,
+    label = "Consumption pre-transfer (income effect)"
+  )
   
   
-
-  #Add total consumption budget effect (inequality neutral)
-  decileWelfChange <-
-    decileConsShare %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>%
-    pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
-    {
-      wide <- .
-      # identify scenario columns (everything that isn’t an id column)
-      id_cols <- c("region", "period", "decileGroup")
-      scen_cols <- setdiff(names(wide), id_cols)
-      
-      # baseline column = any column whose name contains reference_run_name (first match if multiple)
-      baseline_col <- scen_cols[str_detect(scen_cols, fixed(reference_run_name))]
-      
-      # policy columns = any columns whose names contain any of the all_budgets tokens
-      policy_regex <- paste(all_budgets, collapse = "|")
-      policy_cols <- scen_cols[str_detect(scen_cols, policy_regex)]
-      
-      wide %>%
-        mutate(.base = .data[[baseline_col]]) %>%
-        mutate(
-          across(
-            all_of(policy_cols),
-            ~ log(.x / .base) * 100
-          )
-        ) %>%
-        select(all_of(id_cols), all_of(policy_cols)) %>%
-        pivot_longer(
-          cols = all_of(policy_cols),
-          names_to = "scenario",
-          values_to = "decilWelfChange"
-        ) %>%
-        mutate(category = "Consumption With NeutTransf")
-    } %>%
-    bind_rows(decileWelfChange)
-  
- 
-  decileWelfChange <- decileConsShare %>%
-    select(scenario, region, period, decileGroup, consumptionCa) %>% 
-    left_join(transferEpc,by = c('scenario', 'region', 'period','decileGroup')) %>%
-    left_join(transferNeut,by = c('scenario', 'region', 'period','decileGroup')) %>%
-    mutate(transferEpc = if_else(scenario == "C_SSP2-NPi2025", 0, transferEpc),
-           transferNeut = if_else(scenario == "C_SSP2-NPi2025", 0, transferNeut),
-           consumptionCa  = consumptionCa - transferNeut + transferEpc) %>%
-    select(-transferNeut, -transferEpc) %>%
-    pivot_wider(names_from = scenario, values_from = consumptionCa) %>%
-    {
-      wide <- .
-      # identify scenario columns (everything that isn’t an id column)
-      id_cols <- c("region", "period", "decileGroup")
-      scen_cols <- setdiff(names(wide), id_cols)
-      
-      # baseline column = any column whose name contains reference_run_name (first match if multiple)
-      baseline_col <- scen_cols[str_detect(scen_cols, fixed(reference_run_name))]
-      
-      # policy columns = any columns whose names contain any of the all_budgets tokens
-      policy_regex <- paste(all_budgets, collapse = "|")
-      policy_cols <- scen_cols[str_detect(scen_cols, policy_regex)]
-      
-      wide %>%
-        mutate(.base = .data[[baseline_col]]) %>%
-        mutate(
-          across(
-            all_of(policy_cols),
-            ~ log(.x / .base) * 100
-          )
-        ) %>%
-        select(all_of(id_cols), all_of(policy_cols)) %>%
-        pivot_longer(
-          cols = all_of(policy_cols),
-          names_to = "scenario",
-          values_to = "decilWelfChange"
-        ) %>%
-        mutate(category = "Consumption With EpcTransf")
-    } %>%
-    bind_rows(decileWelfChange)
+  neutTransferEffect <- consNeut %>%
+    dplyr::filter(stringr::str_detect(scenario, policyRegex)) %>%
+    dplyr::mutate(
+      decilWelfChange = log(consumptionCa / consumptionPre) * 100,
+      category = "Neut transfer effect"
+    ) %>%
+    dplyr::select(scenario, region, period, decileGroup, category, decilWelfChange)
   
   
-
-    
-
+  neutTotalEffect <- computeLogChangeVsBaseline(
+    df = consNeut,
+    value_col = consumptionCa,
+    baselineScenario = baselineScenario,
+    policyRegex = policyRegex,
+    label = "Consumption With NeutTransf"
+  )
+  
+  
+  consEpc <- consNeut %>%
+    dplyr::left_join(transferEpc, by = c("scenario","region","period","decileGroup")) %>%
+    dplyr::mutate(
+      transferEpc = dplyr::if_else(scenario == baselineScenario, 0, transferEpc),
+      consumptionEpc = consumptionPre + transferEpc
+    )
+  
+  
+  epcTransferEffect <- consEpc %>%
+    dplyr::filter(stringr::str_detect(scenario, policyRegex)) %>%
+    dplyr::mutate(
+      decilWelfChange = log(consumptionEpc / consumptionPre) * 100,
+      category = "Epc transfer effect"
+    ) %>%
+    dplyr::select(scenario, region, period, decileGroup, category, decilWelfChange)
+  
+  
+  epcTotalEffect <- computeLogChangeVsBaseline(
+    df = consEpc,
+    value_col = consumptionEpc,
+    baselineScenario = baselineScenario,
+    policyRegex = policyRegex,
+    label = "Consumption With EpcTransf"
+  )
+  
+  
+  decileWelfChange <- bind_rows(decileWelfChange, incomeEffect, 
+                                neutTransferEffect, neutTotalEffect,
+                                epcTransferEffect,epcTotalEffect)
 
     
   return(decileWelfChange)

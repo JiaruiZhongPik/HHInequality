@@ -85,7 +85,7 @@ REMIND_pattern <- "REMIND_generic*.mif"
 #Model setting
 regions <- 'H12'                            # options are H12 or H21, seemingly redundant
 regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
-regressRegGrouping <- 'pool'                # options are: "H12", "H21", "country", "pool"
+regressRegGrouping <- 'pool'                 # options are: "H12", "H21", "pool"
 consData <- 'mcc'                           # options are: gcd, mcc
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
@@ -93,7 +93,7 @@ micro_model <- 'FOwelfare'                  # options: only "FOwelfare" as of ye
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-MCCJoint-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'RESCUE','-','blended','-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -113,23 +113,31 @@ load("RESCUE.RData")
 
 
 #Engel curve estimation
-coef <- analyze_regression(regressModel = regressModel,
-                          consData = consData,
-                          regressRegGrouping = regressRegGrouping,
-                          allCoef = FALSE,
-                          isDisplay = TRUE,
-                          isExport = FALSE,
-                          export_path = NULL,
-                          # optional MCC cleaning:
-                          mcc_sum_share_range = c(0.85,1.05))
-#Todo: regiona estimates are incomplete, fix before use
+coef <- get_engelCurveCoef(
+  regressModel       = regressModel,
+  dataSource         = consData,
+  regressRegGrouping = regressRegGrouping,              # used for patched base + gcdRegional patching
+  mccSumShareRange   = c(0.85, 1.05),
+  # patch rules (used only when engelCurveMode == "patched")
+  patchChaFrom       = 'mccPooled',
+  patchJpnFrom       = 'mccPooled',
+  isDisplay          = FALSE
+)
 
 
-#Todo: intercept term is useless, remove it
-decileConsShare <- predict_decileConsShare(data, coef, gini_baseline, regressModel, 
-                                           isDisplay=F, isExport=T, countryExample = setdiff(unique(data$region), "World")  )
+#Todo: regional estimates are incomplete, fix before use
 
-
+decileConsShare <- predict_decileConsShare(
+  data,
+  coef,
+  gini_baseline = gini_baseline,
+  regression_model = regression_model,
+  doBlending = T,
+  blendTailProb = 0.99,
+  blendEndFactor = 2,
+  blendingRegGrouping = "H12",
+  mccSumShareRange = c(0.85, 1.05)
+)
 
 #inspecting intermediate variables, particularly price shock and exposure
 plot_inspection(outputPath = outputPath,
@@ -141,23 +149,20 @@ plot_inspection(outputPath = outputPath,
 
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, 
                                              climaFund = 0,
-                                             fund_return_scale = 0.5,
+                                             #fund_return_scale = 0.5,
                                              payg = 1,
-                                             micro_model, fixed_point) # unit log different change in %
+                                             micro_model = micro_model, 
+                                             fixed_point = fixed_point) # unit log different change in %
 
 # ZJ: make sense to separate consumption effect and transfer effect, as the latter is getting more important
 
 
-#To do needs debug for Neutral transfer
+
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
                                   data2 = decileConsShare, 
                                   data3 = data,
                                   montecarlo = TRUE, n_perms = 300)
 
-
-#validate the theil combiled in total and decomposed
-#ineq[['theilLDecomp']] %>% group_by(scenario, period) %>% dplyr::summarize(theil = sum(Tl.i, na.rm = TRUE), .groups = "drop")
-#ineq[['ineq']] %>% filter(category == 'Total', variable =='ineq|TheilLPost', region=='World')
 
 #-------Plot-------
 #all plots
@@ -182,7 +187,7 @@ p <- plot_output(outputPath = outputPath,
                  plotdataIneq = ineq,
                  exampleReg = 'IND',
                  plotlist = c('ineqReg_TheilLRela'),
-                 micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
+                 micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
 
 #To get all regional plots
 # for(r in c(unique(decileWelfChange$region),'World') ){

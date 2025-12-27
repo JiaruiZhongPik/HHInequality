@@ -23,14 +23,14 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   consBase <- data2 %>%
     filter(
-      scenario %in% 
-        (all_paths$remind_base %>% 
-           str_remove("-(rem|mag)-\\d+$") %>% 
+      scenario %in%
+        (all_paths$remind_base %>%
+           str_remove("-(rem|mag)-\\d+$") %>%
            unique())
     ) %>%
     select(-starts_with("share|")) %>%
     rename( remind_base = scenario)
-  
+
   consBase <- data2 %>%
     select(-starts_with("share|"), -consumptionCa) %>%
     filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%

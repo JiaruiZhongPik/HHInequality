@@ -4,23 +4,30 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange,
                                         data2 = decileConsShare,
                                         level = c("fullSec", "groupedSec", 
                                                   "totalSec", "totalWithTransfEpc", 
-                                                  "totalWithTransfNeut"), 
+                                                  "totalWithTransfNeut","all"), 
                                         region = 'region') {
   
-  if(!startsWith(level, "totalWithTransf")){
+  if(level == 'all'){
     
+    welf <- data1
+  
+  } else if( level %in% c("fullSec", "groupedSec", 
+                          "totalSec") ){
     welf <- data1 %>%
-      filter(!str_starts(category, "Consumption"))
+      filter(!str_starts(category, "Consumption") &
+               !stringr::str_detect(category, "transfer effect"))
     
   } else if(level == "totalWithTransfEpc" ) {
     
     welf <- data1 %>%
-      filter(!(str_starts(category, "Consumption") & category != "Consumption With EpcTransf"))
+      filter(!(str_starts(category, "Consumption") & category != "Consumption With EpcTransf") &
+               !stringr::str_detect(category, "transfer effect"))
     
   } else if (level == "totalWithTransfNeut") {
     
     welf <- data1 %>%
-      filter(!(str_starts(category, "Consumption") & category != "Consumption With NeutTransf"))
+      filter(!(str_starts(category, "Consumption") & category != "Consumption With NeutTransf")&
+               !stringr::str_detect(category, "transfer effect"))
   
   }
 
@@ -45,7 +52,8 @@ aggregate_decileWelfChange <- function( data1 = decileWelfChange,
       level == "groupedSec" & category == "Consumption" ~ "Consumption",
       level == "totalSec" ~ "TotalSec",
       level == "totalWithTransfEpc" ~ "TotalWithTransfEpc",
-      level == "totalWithTransfNeut" ~ "TotalWithTransfNeut"
+      level == "totalWithTransfNeut" ~ "TotalWithTransfNeut",
+      level == "all" ~ category
     )) %>%
     group_by(scenario, region, decileGroup , period, group) %>%
     summarise( welfChangeGroup = sum(decilWelfChange, na.rm = T),
