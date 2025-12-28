@@ -1,114 +1,148 @@
-
-
-aggregate_decileWelfChange <- function( data1 = decileWelfChange, 
-                                        data2 = decileConsShare,
-                                        level = c("fullSec", "groupedSec", 
-                                                  "totalSec", "totalWithTransfEpc", 
-                                                  "totalWithTransfNeut","all"), 
-                                        region = 'region') {
+aggregate_decileWelfChange <- function(
+    data1 = decileWelfChange,
+    data2 = decileConsShare,
+    secLevel = c("fullSec", "groupedSec", "totalSec",
+                 "totalWithTransfEpc", "totalWithTransfNeut", "all"),
+    scope = c("region", "global", "decile", "globalDecile"),
+    weightScenario = "C_SSP2-NPi2025",          
+    weightCol = "consumptionCa"    
+) {
+  secLevel <- match.arg(secLevel)
+  scope    <- match.arg(scope)
   
-  if(level == 'all'){
-    
+  # --- 1) Filter components based on secLevel ---
+  if (secLevel == "all") {
     welf <- data1
-  
-  } else if( level %in% c("fullSec", "groupedSec", 
-                          "totalSec") ){
+  } else if (secLevel %in% c("fullSec", "groupedSec", "totalSec")) {
     welf <- data1 %>%
-      filter(!str_starts(category, "Consumption") &
-               !stringr::str_detect(category, "transfer effect"))
-    
-  } else if(level == "totalWithTransfEpc" ) {
-    
+      dplyr::filter(
+        !stringr::str_starts(category, "Consumption"),
+        !stringr::str_detect(category, "transfer effect")
+      )
+  } else if (secLevel == "totalWithTransfEpc") {
     welf <- data1 %>%
-      filter(!(str_starts(category, "Consumption") & category != "Consumption With EpcTransf") &
-               !stringr::str_detect(category, "transfer effect"))
-    
-  } else if (level == "totalWithTransfNeut") {
-    
+      dplyr::filter(
+        !(stringr::str_starts(category, "Consumption") &
+            category != "Consumption With EpcTransf"),
+        !stringr::str_detect(category, "transfer effect")
+      )
+  } else if (secLevel == "totalWithTransfNeut") {
     welf <- data1 %>%
-      filter(!(str_starts(category, "Consumption") & category != "Consumption With NeutTransf")&
-               !stringr::str_detect(category, "transfer effect"))
-  
+      dplyr::filter(
+        !(stringr::str_starts(category, "Consumption") &
+            category != "Consumption With NeutTransf"),
+        !stringr::str_detect(category, "transfer effect")
+      )
   }
-
   
-  exp <- data2 %>%
-    select( -starts_with("share|") )
+  # --- 2) Build weights table ---
+  if (!weightCol %in% names(data2)) {
+    stop("weightCol = '", weightCol, "' not found in data2.")
+  }
   
+  weight_sym <- rlang::sym(weightCol)
   
-  level <- match.arg(level)
+  if (!is.null(weightScenario)) {
+    weights_tbl <- data2 %>%
+      dplyr::filter(scenario == weightScenario) %>%
+      dplyr::select(region, period, decileGroup, weight = !!weight_sym)
+  } else {
+    # scenario-specific weights (generally NOT what you want for consistency)
+    weights_tbl <- data2 %>%
+      dplyr::select(scenario, region, period, decileGroup, weight = !!weight_sym)
+  }
   
-  # Define category groupings
-  food_cats <- c("Animal products", "Empty calories", "Fruits vegetables nuts", "Staples")
+  # --- 3) Regroup categories ---
+  food_cats   <- c("Animal products", "Empty calories", "Fruits vegetables nuts", "Staples")
   energy_cats <- c("Building electricity", "Building gases", "Building other fuels", "Transport energy")
   
-  # Re-group categories if needed
-  df <-  welf %>%
-    mutate(group = case_when(
-      level == "fullSec" ~ category,
-      level == "groupedSec" & category %in% food_cats ~ "Food",
-      level == "groupedSec" & category %in% energy_cats ~ "Energy",
-      level == "groupedSec" & category == "Other commodities" ~ "Other commodities",
-      level == "groupedSec" & category == "Consumption" ~ "Consumption",
-      level == "totalSec" ~ "TotalSec",
-      level == "totalWithTransfEpc" ~ "TotalWithTransfEpc",
-      level == "totalWithTransfNeut" ~ "TotalWithTransfNeut",
-      level == "all" ~ category
+  df <- welf %>%
+    dplyr::mutate(group = dplyr::case_when(
+      secLevel == "fullSec" ~ category,
+      
+      secLevel == "groupedSec" & category %in% food_cats ~ "Food",
+      secLevel == "groupedSec" & category %in% energy_cats ~ "Energy",
+      secLevel == "groupedSec" & category == "Other commodities" ~ "Other commodities",
+      secLevel == "groupedSec" & category == "Consumption" ~ "Consumption",
+      
+      secLevel == "totalSec" ~ "TotalSec",
+      secLevel == "totalWithTransfEpc" ~ "TotalWithTransfEpc",
+      secLevel == "totalWithTransfNeut" ~ "TotalWithTransfNeut",
+      
+      secLevel == "all" ~ category,
+      TRUE ~ category
     )) %>%
-    group_by(scenario, region, decileGroup , period, group) %>%
-    summarise( welfChangeGroup = sum(decilWelfChange, na.rm = T),
-               , .groups = "drop") %>%
-    left_join( exp, by = c("scenario", "region", "decileGroup",  "period"))
+    dplyr::group_by(scenario, region, decileGroup, period, group) %>%
+    dplyr::summarise(
+      welfChangeGroup = sum(decilWelfChange, na.rm = TRUE),
+      .groups = "drop"
+    )
   
-  
-  if(region == 'region'){
-    
-    welfAgg <-  df %>%
-      group_by(scenario, region, period, group) %>%
-      summarise(
-        weighted_welfare = sum( welfChangeGroup * consumptionCa, na.rm = TRUE) / sum(consumptionCa, na.rm = TRUE),
-        .groups = "drop"
-      )%>%
-      rename(welfChange = weighted_welfare,
-             category = group)
-    
-  } else if(region =='global') {
-    
-    welfAgg <-  df %>%
-      group_by(scenario, period, group) %>%
-      summarise(
-        weighted_welfare = sum( welfChangeGroup * consumptionCa, na.rm = TRUE) / sum(consumptionCa, na.rm = TRUE),
-        .groups = "drop"
-      )%>%
-      rename(welfChange = weighted_welfare,
-             category = group)
-    
-  } else if ( region == 'decile' ) {
-    
-    welfAgg <-  df %>%
-      group_by(scenario, region, period, decileGroup, group) %>%
-      summarise(
-        weighted_welfare = sum( welfChangeGroup * consumptionCa, na.rm = TRUE) / sum(consumptionCa, na.rm = TRUE),
-        .groups = "drop"
-      )%>%
-      rename(welfChange = weighted_welfare,
-             category = group)
-    
-  }else if ( region == 'globalDecile' ) {
-    
-    welfAgg <-  df %>%
-      group_by(scenario, period, decileGroup, group) %>%
-      summarise(
-        weighted_welfare = sum( welfChangeGroup * consumptionCa, na.rm = TRUE) / sum(consumptionCa, na.rm = TRUE),
-        .groups = "drop"
-      )%>%
-      rename(welfChange = weighted_welfare,
-             category = group)
-    
+  # --- 4) Join weights ---
+  if (is.null(weightScenario)) {
+    df <- df %>%
+      dplyr::left_join(
+        weights_tbl,
+        by = c("scenario", "region", "period", "decileGroup")
+      )
+  } else {
+    df <- df %>%
+      dplyr::left_join(
+        weights_tbl,
+        by = c("region", "period", "decileGroup")
+      )
   }
   
-  return(welfAgg)
+  if (!"weight" %in% names(df)) {
+    stop("Internal error: weight column missing after join.")
+  }
+  
+  # Optional sanity check: warn if weights missing
+  if (any(is.na(df$weight))) {
+    warning("Some weights are NA after the join (likely missing baseline weights for some region/decile/period).")
+  }
+  
+  # --- 5) True aggregated log change: log( sum(w * exp(delta)) / sum(w) ) ---
+  trueLogAgg <- function(d) {
+    d %>%
+      dplyr::summarise(
+        welfChange = 100 * log(
+          sum(.data$weight * exp(.data$welfChangeGroup / 100), na.rm = TRUE) /
+            sum(.data$weight, na.rm = TRUE)
+        ),
+        .groups = "drop"
+      )
+  }
+  
+  # --- 6) Aggregate by scope ---
+  if (scope == "region") {
+    out <- df %>%
+      dplyr::group_by(scenario, region, period, group) %>%
+      trueLogAgg() %>%
+      dplyr::rename(category = group)
+    
+  } else if (scope == "global") {
+    out <- df %>%
+      dplyr::group_by(scenario, period, group) %>%
+      trueLogAgg() %>%
+      dplyr::rename(category = group)
+    
+  } else if (scope == "decile") {
+    out <- df %>%
+      dplyr::group_by(scenario, region, period, decileGroup, group) %>%
+      trueLogAgg() %>%
+      dplyr::rename(category = group)
+    
+  } else if (scope == "globalDecile") {
+    out <- df %>%
+      dplyr::group_by(scenario, period, decileGroup, group) %>%
+      trueLogAgg() %>%
+      dplyr::rename(category = group)
+  }
+  
+  out
 }
+
 
 
 

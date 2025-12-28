@@ -222,6 +222,25 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
   baselineScenario <- paste0('C_',all_runscens,'-',reference_run_name)
   policyRegex <- paste(all_budgets, collapse = "|")
   
+  computeLogChangeVsBaseline <- function(df, value_col, baselineScenario, policyRegex, label) {
+    id_cols <- c("region", "period", "decileGroup")
+    
+    base <- df %>%
+      dplyr::filter(scenario == baselineScenario) %>%
+      dplyr::select(dplyr::all_of(id_cols), base = {{ value_col }})
+    
+    out <- df %>%
+      dplyr::filter(stringr::str_detect(scenario, policyRegex)) %>%
+      dplyr::left_join(base, by = id_cols) %>%
+      dplyr::mutate(
+        decilWelfChange = log({{ value_col }} / base) * 100,
+        category = label
+      ) %>%
+      dplyr::select(scenario, region, period, decileGroup, category, decilWelfChange)
+    
+    out
+  }
+  
   # consumption with Neut (your current assumption)
   consNeut <- data2 %>%
     dplyr::select(scenario, region, period, decileGroup, consumptionCa) %>%

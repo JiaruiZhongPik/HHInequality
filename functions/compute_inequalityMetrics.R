@@ -7,6 +7,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   
   result <- list()
+  sectors <- c("Building electricity", "Building other fuels",           
+               "Empty calories","Fruits vegetables nuts", "Transport energy", 
+               "Other commodities", "Building gases", "Staples" ,"Animal products")
   
   mapping <- all_paths %>%
     select( remind_run, remind_base ) %>%
@@ -78,8 +81,9 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   #--------Compute the post inequality metrics (all channels included With neutral tranfer)-----------
   #get the total log points change
   welfByDecileTransfNeut <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-                                                       data2 = decileConsShare, level = c("totalWithTransfNeut"), 
-                                                       region = 'decile')
+                                                       data2 = decileConsShare, 
+                                                       secLevel = c("totalWithTransfNeut"), 
+                                                       scope = 'decile')
   
   
   
@@ -124,8 +128,8 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   welfByDecileTransfEpc <- aggregate_decileWelfChange(data1 = decileWelfChange, 
                                                       data2 = decileConsShare, 
-                                                      level = c("totalWithTransfEpc"), 
-                                                      region = 'decile')
+                                                      secLevel = c("totalWithTransfEpc"), 
+                                                      scope  = 'decile')
   
   ineqRegPolAllEpc <- consBase %>%
     merge( welfByDecileTransfEpc, by = c('scenario', 'region', 'period', 'decileGroup')) %>%
@@ -163,13 +167,13 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   # welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, 
   #                                               data2 = decileConsShare, 
-  #                                               level = c("fullSec"), 
-  #                                               region = 'decile')
+  #                                               secLevel = c("fullSec"), 
+  #                                               scope = 'decile')
   
   #Step1:channel-wise shock
   df <- consBase %>%
     merge(
-      data1 %>% filter(!str_starts(category, "Consumption")),
+      data1 %>% filter(category %in% sectors),
       by = c("scenario", "region", "period", "decileGroup"),
       suffixes = c("", "_welf")
     ) %>%

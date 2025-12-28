@@ -58,10 +58,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     "C_SSP2-loOS-def"   = "SSP2-1.5°C LO"
   )
   
-  mySecPalette <- rev(c(
-    "#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
+  mySecPalette <- rev("#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
     "#FAF3CEFF", "#CFE690FF", "#F2AB70FF", "#FEC5A0FF"
-  ))
+  )
   
   myScenPalette <- c(
     "C_SSP2-PkBudg1000" = "#e8ab67",  # 2°C
@@ -582,7 +581,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist=="foodEneContribution")| allExport ){
     
     df <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                               level = c("fullSec"), region = 'global') %>%
+                               secLevel = c("fullSec"), scope = 'global') %>%
       mutate(category = factor(category, levels = allSec))
     
     plotdf <- df %>%
@@ -1187,7 +1186,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist=='globalWelfBySec')| allExport ){
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("fullSec"), region = 'global') %>%
+                                         secLevel = c("fullSec"), scope = 'global') %>%
       filter(category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
 
@@ -1227,10 +1226,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
 
   if(any(plotlist=='regionalWelfBySec')| allExport ){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("fullSec"), region = 'region') %>%
-      filter(category != 'Other commodities') %>%
-      mutate(category = factor(category, levels = allSec))
+    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
+                                         secLevel = c("all"), scope = 'region') %>%
+      filter(category %in% c(foodSec,eneSec ) ) %>%
+      mutate(category = factor(category, levels = c(foodSec,eneSec)))
     
 
     
@@ -1311,7 +1310,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist == 'regWelfBySec' | allExport  )){
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("full"), region = 'region') %>%
+                                         secLevel = c("fullSec"), scope = 'region') %>%
+      filter(category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
     
 
@@ -3137,7 +3137,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   if(any(plotlist == 'secBurdenByGlobalDecile' | allExport  )){
     
     plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("fullSec"), region = 'globalDecile') %>%
+                                         secLevel = c("fullSec"), scope = 'globalDecile') %>%
       filter(period %in% c('2030','2050','2100'),
              category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
@@ -3191,11 +3191,11 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'secBurdenByRegDecile' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                                         level = c("fullSec"), region = 'decile') %>%
+    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
+                                         secLevel = c("all"), scope = 'decile') %>%
       filter(period %in% c('2030','2050','2100'),
-             category != 'Other commodities') %>%
-      mutate(category = factor(category, levels = allSec) )
+             category %in% c(foodSec,eneSec)) %>%
+      mutate(category = factor(category, levels = c(foodSec,eneSec)) )
     
     
     iter = 1

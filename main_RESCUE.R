@@ -125,8 +125,8 @@ coef <- get_engelCurveCoef(
 )
 
 
-#Todo: regional estimates are incomplete, fix before use
 
+#Predict consumption shares for each regional decile
 decileConsShare <- predict_decileConsShare(
   data,
   coef,
@@ -139,6 +139,7 @@ decileConsShare <- predict_decileConsShare(
   mccSumShareRange = c(0.85, 1.05)
 )
 
+
 #inspecting intermediate variables, particularly price shock and exposure
 plot_inspection(outputPath = outputPath,
                 dataPrice = data,
@@ -146,7 +147,7 @@ plot_inspection(outputPath = outputPath,
                 isDisplay = F, isExport = T, 
                 allExport=T)
 
-
+#predict welfare change of different category
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, 
                                              climaFund = 0,
                                              #fund_return_scale = 0.5,
@@ -154,14 +155,13 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare,
                                              micro_model = micro_model, 
                                              fixed_point = fixed_point) # unit log different change in %
 
-# ZJ: make sense to separate consumption effect and transfer effect, as the latter is getting more important
-
-
-
+#computes inequality metrics
 ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
                                   data2 = decileConsShare, 
                                   data3 = data,
                                   montecarlo = TRUE, n_perms = 300)
+
+#Todo: a function computes the percentage change of real consumption at the baseline consumption level
 
 
 #-------Plot-------
