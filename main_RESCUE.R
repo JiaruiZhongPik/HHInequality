@@ -186,7 +186,7 @@ p <- plot_output(outputPath = outputPath,
                  data3 = data, 
                  plotdataIneq = ineq,
                  exampleReg = 'IND',
-                 plotlist = c('ineqReg_TheilLRela'),
+                 plotlist = c('ineqWorldWithTransf_GiniRela'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
 
 #To get all regional plots

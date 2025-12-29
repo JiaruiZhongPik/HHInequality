@@ -83,7 +83,7 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
         TRUE ~ variable  # keep unchanged otherwise
       )) %>%
       #Note: there are INF for minor cases, when the base year price is zero. For
-      #these, I currently replace with the value from the closest year
+      #these, I currently replace with the value from the closest yea
       #same is done for food price
       group_by(region, scenario, variable) %>%
       mutate(value = ifelse(

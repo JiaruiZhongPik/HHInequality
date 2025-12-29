@@ -4,13 +4,11 @@
 
 plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
   
-  plotdataWelfWithTransfEpc <- data1 %>%
-    filter(category != 'Consumption With NeutTransf') %>%
-    filter( period %notin% c(2010,2110,2130,2150)) 
+  data1 <- data1 %>%
+    filter(period %notin% c(2010,2110,2130,2150)) 
   
-  plotdataWelf <- data1 %>%
-    filter(category != 'Consumption With EpcTransf') %>%
-    filter( period %notin% c(2010,2110,2130,2150)) 
+  data2 <- data2 %>%
+    filter(period %notin% c(2010,2110,2130,2150)) 
   
   data3 <- data3 %>%
     filter(period %notin% c(2010,2110,2130,2150)) 
@@ -58,8 +56,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     "C_SSP2-loOS-def"   = "SSP2-1.5°C LO"
   )
   
-  mySecPalette <- rev("#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
-    "#FAF3CEFF", "#CFE690FF", "#F2AB70FF", "#FEC5A0FF"
+  mySecPalette <- rev(c("#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
+    "#FAF3CEFF", "#CFE690FF", "#F2AB70FF", "#FEC5A0FF")
   )
   
   myScenPalette <- c(
@@ -73,13 +71,19 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
 
 #-------------------------1.Plots all aggregated welfare change------------------------
   
-  if(any(plotlist == "welfByPeriod") | allExport){
+  if(any(plotlist == "welfByPeriodNeut") | allExport){
     #todo: is using weighted average better?
     
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100 ) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")%>%
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfNeut",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    ) %>%
       mutate(scenario = factor(scenario, levels = c(
         "C_SSP2-PkBudg1000",
         "C_SSP2-PkBudg650",
@@ -89,7 +93,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
 
     avg_df_period <- dataDecile %>%
       group_by(scenario, period) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
       mutate(scenario = factor(scenario, levels = c(
         "C_SSP2-PkBudg1000",
         "C_SSP2-PkBudg650",
@@ -98,10 +102,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       )))
       
     
-    
-    p[['welfByPeriod']] <- list(
+    p[['welfByPeriodNeut']] <- list(
+      
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                   aes(x = period, y = sumWelfChange, fill = scenario)) +
+                   aes(x = period, y = relChange, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
@@ -128,11 +132,11 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           ) +
         
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-hiOS-def"), period >= 2025),
+                  aes(x = period + 1, y = meanRelChange),
                   color = "#ba7a31", linewidth = 0.7) +
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+                  aes(x = period - 1, y = meanRelChange),
                   color = "#264f78", linewidth = 0.7)+
         
         #  Custom color mapping for boxes and lines
@@ -150,7 +154,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         
         # Labels and styling
         labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE))
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE))
         # + theme_minimal()
         # + theme(
         #   axis.text.x = element_text(angle = 45, hjust = 1),
@@ -172,438 +176,19 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
     }
   
-  
-  if(any(plotlist == "welfByDecile") | allExport){
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_decile <- dataDecile %>%
-      group_by(scenario, decileGroup) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
-    
-    p[['welfByDecile']] <- list (
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
-        
-        geom_boxplot(outlier.shape = NA, width = 0.4, 
-                     position = position_dodge(width = 0.5), color = "grey20") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
-                  linewidth = 0.7) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                                      "C_SSP2-PkBudg650"  = "#264f78",
-                                      "C_SSP2-hiOS-def" = "#e8ab67", 
-                                      "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                   "C_SSP2-PkBudg650"  = "1.5°C",
-                   "C_SSP2-hiOS-def" = "1.5°C HO",
-                   "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
-        theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 5,
-      height = 3 
-      
-    )
-  }
-#---------------------End:Plots all aggregated----------------------------------  
-
-  
-  
-  
-  
-#-----------------------2.1. Plots Ene aggregated(welfare change)---------------
-  
-  if(any(plotlist == "welfByPeriodEne") | allExport){
+  if(any(plotlist == "welfByPeriodEpc") | allExport){
     #todo: is using weighted average better?
     
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% eneSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_period <- dataDecile %>%
-      group_by(scenario, period) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    
-    p[['welfByPeriodEne']] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = sumWelfChange, fill = scenario)) +
-        
-        # Side-by-side boxplots per scenario and period
-        geom_boxplot(aes(group = interaction(period, scenario)), 
-                     position = position_dodge(width = 3), width = 3,
-                     outlier.shape = NA, color = "gray40") +
-        
-        # Mean points
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 5), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
-                    alpha = 0.3, size = 0.2) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
-                  color = "#ba7a31", linewidth = 0.7) +
-        
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-loOS-def" ), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
-                  color = "#264f78", linewidth = 0.7)+
-        
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))+
-        
-        # Labels and styling
-        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme_minimal() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 5,
-      height = 3
-      
-    )
-    
-    
-    
-  }
-  
-  
-  if(any(plotlist == "welfByDecileEne") | allExport){
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% eneSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_decile <- dataDecile %>%
-      group_by(scenario, decileGroup) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
-    
-    p[['welfByDecile']] <- list (
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
-        
-        geom_boxplot(outlier.shape = NA, width = 0.4, 
-                     position = position_dodge(width = 0.5), color = "grey20") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
-                  linewidth = 0.7) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        )+
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 5,
-      height = 3 
-      
-    )
-  }
-#---------------------End:Plots Ene aggregated----------------------------------  
-  
-  
-  
-  
-  
-  
-#-----------------------2.2. Plots food aggregated(welfare change)--------------
-  
-  if(any(plotlist == "welfByPeriodFood") | allExport){
-    #todo: is using weighted average better?
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% foodSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_period <- dataDecile %>%
-      group_by(scenario, period) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    
-    p[['welfByPeriodFood']] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = sumWelfChange, fill = scenario)) +
-        
-        # Side-by-side boxplots per scenario and period
-        geom_boxplot(aes(group = interaction(period, scenario)), 
-                     position = position_dodge(width = 3), width = 3,
-                     outlier.shape = NA, color = "gray40") +
-        
-        # Mean points
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 5), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
-                    alpha = 0.3, size = 0.2) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        
-        # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
-                  color = "#ba7a31", linewidth = 0.7) +
-        
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
-                  color = "#264f78", linewidth = 0.7)+
-        
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))+
-        
-        # Labels and styling
-        labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme_minimal() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 5,
-      height = 3
-      
-    )
-    
-    
-    
-  }
-  
-  
-  if(any(plotlist == "welfByDecileFood") | allExport){
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% foodSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_decile <- dataDecile %>%
-      group_by(scenario, decileGroup) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
-    
-    p[['welfByDecileFood']] <- list (
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
-        
-        geom_boxplot(outlier.shape = NA, width = 0.4, 
-                     position = position_dodge(width = 0.5), color = "grey20") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = meanWelfChange, group = scenario, color = scenario), 
-                  size = 0.7) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 5,
-      height = 3 
-      
-    )
-  }
-  
-#---------------------End:Plots Ene aggregated----------------------------------  
-  
-
-#----------2.3. contribution food and energy aggregated(welfare change)---------
-
-  if(any(plotlist=="foodEneContribution")| allExport ){
-    
-    df <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
-                               secLevel = c("fullSec"), scope = 'global') %>%
-      mutate(category = factor(category, levels = allSec))
-    
-    plotdf <- df %>%
-      filter(period <= 2100,
-             category %in% foodSec) %>%
-      group_by(scenario, period, ) %>%
-      summarise(foodShare = sum(welfChange, na.rm = TRUE), .groups = "drop") 
-    
-    plotdf <- df %>%
-      filter(period <= 2100,
-             category %in% eneSec) %>%
-      group_by(scenario, period) %>%
-      summarise(eneShare = sum(welfChange, na.rm = TRUE), .groups = "drop") %>%
-      left_join(plotdf, by=c('scenario','period')) %>%
-      pivot_longer(cols = c('eneShare','foodShare'), names_to = 'category',
-                   values_to = 'value') %>%
-      group_by(scenario, period) %>%
-      mutate(
-        value = value / sum(value, na.rm = TRUE),
-        value = ifelse(is.na(value), 0, value)
-      ) %>%
-      ungroup() %>%
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfEpc",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    ) %>%
       mutate(scenario = factor(scenario, levels = c(
         "C_SSP2-PkBudg1000",
         "C_SSP2-PkBudg650",
@@ -611,39 +196,328 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         "C_SSP2-hiOS-def" 
       )))
     
-    # Automate over all scenarios
-    p[['foodEneContribution']] <- list(
-      plot =
-        ggplot(plotdf, aes(x = period, y = value, fill = category)) +
-        geom_col(position = "stack") +
-        facet_wrap(~ scenario, ncol = 2,
-                   labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-loOS-def"  = "1.5°C LO",
-                       "C_SSP2-hiOS-def" = "1.5°C HO"
-                       )
-                   )) +
-        labs(
-          x = "Year",
-          y = "Real Consumption Change (%)",
-          fill = "Category"
-        ) +
-        scale_fill_paletteer_d("ButterflyColors::astraptes_fulgerator",
-                               labels = c("foodShare" = "Food",
-                                          "eneShare"  = "Energy")) +
-        guides(fill = guide_legend(reverse = TRUE)) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))
+    avg_df_period <- dataDecile %>%
+      group_by(scenario, period) %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000",
+        "C_SSP2-PkBudg650",
+        "C_SSP2-loOS-def", 
+        "C_SSP2-hiOS-def" 
+      )))
+    
+    
+    p[['welfByPeriodEpc']] <- list(
+      
+      plot = ggplot(dataDecile %>% filter(period <= 2100), 
+                    aes(x = period, y = relChange, fill = scenario)) +
         
+        # Side-by-side boxplots per scenario and period
+        geom_boxplot(aes(group = interaction(period, scenario)), 
+                     position = position_dodge(width = 3), width = 3,
+                     outlier.shape = NA, color = "gray40") +
+        
+        # Mean points
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 5), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
+                    alpha = 0.3, size = 0.2) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67",
+                     "C_SSP2-loOS-def" = "#264f78"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+        ) +
+        
+        # One-by-one geom_line for each scenario
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-hiOS-def"), period >= 2025),
+                  aes(x = period + 1, y = meanRelChange),
+                  color = "#ba7a31", linewidth = 0.7) +
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+                  aes(x = period - 1, y = meanRelChange),
+                  color = "#264f78", linewidth = 0.7)+
+        
+        #  Custom color mapping for boxes and lines
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67", 
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def"  = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")) +
+        scale_x_continuous(breaks = unique(plotdataWelf$period),
+                           labels = unique(plotdataWelf$period)) +
+        
+        # Labels and styling
+        labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE))
+      # + theme_minimal()
+      # + theme(
+      #   axis.text.x = element_text(angle = 45, hjust = 1),
+      #   legend.position = "bottom",
+      #   legend.direction = "horizontal",
+      #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+      #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
+      #   panel.grid.minor = element_blank(),
+      #   panel.background = element_rect(fill = "white", color = NA)
+      # )
       ,
       
-      width = 8,
+      width = 5,
       height = 3
       
     )
+    
+    
+    
   }
   
+  if(any(plotlist == "welfByDecileNeut") | allExport){
+    
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = decileWelfChange,
+      data2 = decileConsShare,
+      secLevel = "totalWithTransfNeut",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    ) %>% filter(period <= 2100)
+    
+    avg_df_decile <- dataDecile %>%
+      group_by(scenario, decileGroup) %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
+      mutate(decileGroup = as.factor(decileGroup)) 
+    
+    p[["welfByDecileNeut"]] <- list (
+      
+      plot = ggplot(dataDecile, 
+                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+        
+        geom_boxplot(outlier.shape = NA, width = 0.4, 
+                     position = position_dodge(width = 0.5), color = "grey20") +
+        
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
+                    alpha = 0.3, size = 0.2) +
+        
+        # 🔹 Add mean lines by scenario
+        geom_line(data = avg_df_decile, 
+                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
+                  linewidth = 0.7) +
+        
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 0.7), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+          
+        ) +
+        
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+        ) +
+        
+        
+        labs(x = "Income Decile Group", y = "Real consumpition Change to NPi(%)", fill = "Scenario", color = "Scenario") +
+        theme_minimal() +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        ),
+      
+      width = 5,
+      height = 3 
+      
+    )
+    
+  }
+  
+  
+  if(any(plotlist == "welfByDecileEpc") | allExport){
+    
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = decileWelfChange,
+      data2 = decileConsShare,
+      secLevel = "totalWithTransfEpc",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    )
+    
+    avg_df_decile <- dataDecile %>%
+      group_by(scenario, decileGroup) %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
+      mutate(decileGroup = as.factor(decileGroup)) 
+    
+    p[["welfByDecileEpc"]] <- list (
+      
+      plot = ggplot(dataDecile, 
+                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+        
+        geom_boxplot(outlier.shape = NA, width = 0.4, 
+                     position = position_dodge(width = 0.5), color = "grey20") +
+        
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
+                    alpha = 0.3, size = 0.2) +
+        
+        # 🔹 Add mean lines by scenario
+        geom_line(data = avg_df_decile, 
+                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
+                  linewidth = 0.7) +
+        
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 0.7), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+          
+        ) +
+        
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+        ) +
+        
+        
+        labs(x = "Income Decile Group", y = "Real consumpition Change to NPi (%)", fill = "Scenario", color = "Scenario") +
+        theme_minimal() +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        ),
+      
+      width = 5,
+      height = 3 
+      
+    )
+    
+  }
+  
+  
+#---------------------End:Plots all aggregated----------------------------------  
+
+  
+
+
+#----------2.3. contribution food and energy aggregated(welfare change)---------
+# 
+#   if(any(plotlist=="foodEneContribution")| allExport ){
+#     
+#     df <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
+#                                secLevel = c("groupedSec"), scope = 'global') %>%
+#       filter(category != 'Other commodities')
+#     
+#     plotdf <- df %>%
+#       filter(period <= 2100,
+#              category %in% foodSec) %>%
+#       group_by(scenario, period) %>%
+#       summarise(foodShare = sum(welfChange, na.rm = TRUE), .groups = "drop") 
+#     
+#     plotdf <- df %>%
+#       filter(period <= 2100,
+#              category %in% eneSec) %>%
+#       group_by(scenario, period) %>%
+#       summarise(eneShare = sum(welfChange, na.rm = TRUE), .groups = "drop") %>%
+#       left_join(plotdf, by=c('scenario','period')) %>%
+#       pivot_longer(cols = c('eneShare','foodShare'), names_to = 'category',
+#                    values_to = 'value') %>%
+#       group_by(scenario, period) %>%
+#       mutate(
+#         value = value / sum(value, na.rm = TRUE),
+#         value = ifelse(is.na(value), 0, value)
+#       ) %>%
+#       ungroup() %>%
+#       mutate(scenario = factor(scenario, levels = c(
+#         "C_SSP2-PkBudg1000",
+#         "C_SSP2-PkBudg650",
+#         "C_SSP2-loOS-def", 
+#         "C_SSP2-hiOS-def" 
+#       )))
+#     
+#     # Automate over all scenarios
+#     p[['foodEneContribution']] <- list(
+#       plot =
+#         ggplot(plotdf, aes(x = period, y = value, fill = category)) +
+#         geom_col(position = "stack") +
+#         facet_wrap(~ scenario, ncol = 2,
+#                    labeller = as_labeller(
+#                      c("C_SSP2-PkBudg1000" = "2°C",
+#                        "C_SSP2-PkBudg650"  = "1.5°C",
+#                        "C_SSP2-loOS-def"  = "1.5°C LO",
+#                        "C_SSP2-hiOS-def" = "1.5°C HO"
+#                        )
+#                    )) +
+#         labs(
+#           x = "Year",
+#           y = "Real Consumption Change (%)",
+#           fill = "Category"
+#         ) +
+#         scale_fill_paletteer_d("ButterflyColors::astraptes_fulgerator",
+#                                labels = c("foodShare" = "Food",
+#                                           "eneShare"  = "Energy")) +
+#         guides(fill = guide_legend(reverse = TRUE)) +
+#         scale_x_continuous(breaks = unique(plotdataWelf$period),
+#                            labels = unique(plotdataWelf$period))
+#         
+#       ,
+#       
+#       width = 8,
+#       height = 3
+#       
+#     )
+#   }
+#   
   
     
 #---------------------End:Plots Ene aggregated----------------------------------  
@@ -653,23 +527,30 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   
 #-------------------------3.reg plots all aggregated(welfare change)------------  
-  if(any(plotlist == "welfByDecileReg") | allExport){
+  if(any(plotlist == "welfByDecileRegNeut") | allExport){
     
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfNeut",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    )
+    
     
     avg_df_decile <- dataDecile %>%
-      filter(period <= 2100) %>%
       group_by(scenario, decileGroup,region) %>%
-      summarise(mean_welfare = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
       mutate(decileGroup = as.factor(decileGroup)) 
     
     
-    p[["welfByDecileReg"]] <- list(
+    p[["welfByDecileRegNeut"]] <- list(
+      
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
+                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
         geom_boxplot(outlier.shape = NA, width = 0.5, 
                      position = position_dodge(width = 0.6), color = "grey20") +
         geom_jitter(aes(color = scenario),
@@ -678,7 +559,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         
         # 🔹 Add mean lines by scenario
         geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
+                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
                   size = 0.7) +
         scale_fill_manual(
           values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
@@ -710,7 +591,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         facet_wrap(~ region)+
         theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
@@ -723,22 +604,103 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     )
   }
   
-  
-  if(any(plotlist=='welfByPeriodReg')| allExport ){
+  if(any(plotlist == "welfByDecileRegEpc") | allExport){
     
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfEpc",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    )
+    
+    
+    avg_df_decile <- dataDecile %>%
+      group_by(scenario, decileGroup,region) %>%
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
+      mutate(decileGroup = as.factor(decileGroup)) 
+    
+    
+    p[["welfByDecileRegEpc"]] <- list(
+      
+      plot = ggplot(dataDecile %>% filter(period <= 2100), 
+                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+        geom_boxplot(outlier.shape = NA, width = 0.5, 
+                     position = position_dodge(width = 0.6), color = "grey20") +
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
+                    alpha = 0.3, size = 0.2) +
+        
+        # 🔹 Add mean lines by scenario
+        geom_line(data = avg_df_decile, 
+                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
+                  size = 0.7) +
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+          
+        ) +
+        scale_color_manual(
+          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
+                     "C_SSP2-PkBudg650"  = "#264f78",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def" = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")
+        ) +
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 0.7), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        
+        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
+        facet_wrap(~ region)+
+        theme_minimal() +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        )
+      ,
+      
+      width = 10,
+      height = 8
+    )
+  }
+  
+  if(any(plotlist=='welfByPeriodRegNeut')| allExport ){
+    
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfNeut",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
+    )
     
     avg_df_period <- dataDecile %>%
-      filter(period <= 2100) %>%
       group_by(scenario, period, region) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop")
     
-    p[["welfByPeriodReg"]] <- list(
+    p[["welfByPeriodRegNeut"]] <- list(
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = sumWelfChange, fill = scenario)) +
+                    aes(x = period, y = relChange, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
@@ -756,12 +718,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                     alpha = 0.3, size = 0.2) +
 
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+                  aes(x = period - 1, y = meanRelChange),
                   color = "#ba7a31", size = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-hiOS-def"), period >= 2025),
+                  aes(x = period + 1, y = meanRelChange),
                   color = "#264f78", size = 0.7)+
       
         scale_fill_manual(
@@ -791,7 +753,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         
         # Labels and styling
         labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
         theme(
@@ -807,103 +769,27 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
-#-----------------------------End. 3.reg plots all aggregated----------------- 
   
-  
-  
-  
-  
-  
-#-------------------------3.1 reg plots ene aggregated(welfare change)----------
-  if(any(plotlist == "welfByDecileRegEne") | allExport){
+  if(any(plotlist=='welfByPeriodRegEpc')| allExport ){
     
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% eneSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_decile <- dataDecile %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, decileGroup,region) %>%
-      summarise(mean_welfare = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
-    
-    p[["welfByDecileRegEne"]] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
-        geom_boxplot(outlier.shape = NA, width = 0.5, 
-                     position = position_dodge(width = 0.6), color = "grey20") +
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
-                  size = 0.7) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        facet_wrap(~ region)+
-        theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.005, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 10,
-      height = 8
+    dataDecile <- aggregate_decileWelfChange(
+      data1 = data1,
+      data2 = data2,
+      secLevel = "totalWithTransfEpc",
+      scope = "decile",
+      weightScenario = "C_SSP2-NPi2025",          
+      weightCol = "consumptionCa"    
+    ) %>% mutate(
+      relChange = (exp(welfChange/100) - 1)*100 
     )
-  }
-  
-  
-  if(any(plotlist=='welfByPeriodRegEne')| allExport ){
-
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% eneSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
     
     avg_df_period <- dataDecile %>%
-      filter(period <= 2100) %>%
       group_by(scenario, period, region) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
+      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop")
     
-    p[["welfByPeriodRegEne"]] <- list(
+    p[["welfByPeriodRegEpc"]] <- list(
       plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = sumWelfChange, fill = scenario)) +
+                    aes(x = period, y = relChange, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
@@ -919,6 +805,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_jitter(aes(color = scenario),
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
+        
+        # One-by-one geom_line for each scenario
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+                  aes(x = period - 1, y = meanRelChange),
+                  color = "#ba7a31", size = 0.7) +
+        
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-hiOS-def"), period >= 2025),
+                  aes(x = period + 1, y = meanRelChange),
+                  color = "#264f78", size = 0.7)+
+        
         scale_fill_manual(
           values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
                      "C_SSP2-PkBudg650"  = "#779ec6",
@@ -941,21 +837,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                      "C_SSP2-hiOS-def" = "1.5°C HO",
                      "C_SSP2-loOS-def" = "1.5°C LO")
         ) +
-        # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
-                  color = "#ba7a31", size = 0.7) +
-        
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
-                  color = "#264f78", size = 0.7) +
-    
         scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))+
+                           labels = unique(plotdataWelf$period)) +
         
         # Labels and styling
         labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
         theme(
@@ -968,173 +855,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       height = 8
       
     )
+    
   }
+#-----------------------------End. 3.reg plots all aggregated----------------- 
   
-#---------------------End 3.1 reg plots ene aggregated------------------------
-  
-  
-  
-  
-  
-  
-  
-#-------------------------3.2 reg plots ene aggregated(welfChange)---------------
-  if(any(plotlist == "welfByDecileRegFood") | allExport){
-    
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% foodSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    avg_df_decile <- dataDecile %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, decileGroup,region) %>%
-      summarise(mean_welfare = mean(sumWelfChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
-    
-    p[["welfByDecileRegFood"]] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = sumWelfChange, fill = scenario)) +
-        geom_boxplot(outlier.shape = NA, width = 0.5, 
-                     position = position_dodge(width = 0.6), color = "grey20") +
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = mean_welfare, group = scenario, color = scenario), 
-                  size = 0.7) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        labs(x = "Income Decile Group", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
-        facet_wrap(~ region)+
-        theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.005, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 10,
-      height = 8
-    )
-  }
-  
-  
-  if(any(plotlist=='welfByPeriodRegFood')| allExport ){
-    #todo: is using weighted average better?
-    dataDecile <- plotdataWelf %>%
-      filter(period <= 2100,
-             category %in% foodSec) %>%
-      group_by(scenario, period, region, decileGroup) %>%
-      summarise(sumWelfChange = sum(decilWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    
-    avg_df_period <- dataDecile %>%
-      filter(period <= 2100) %>%
-      group_by(scenario, period, region) %>%
-      summarise(meanWelfChange = mean(sumWelfChange, na.rm = TRUE), .groups = "drop")
-    
-    p[["welfByPeriodRegFood"]] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = sumWelfChange, fill = scenario)) +
-        
-        # Side-by-side boxplots per scenario and period
-        geom_boxplot(aes(group = interaction(period, scenario)), 
-                     position = position_dodge(width = 4), width = 4,
-                     outlier.shape = NA, color = "gray40") +
-        
-        # Mean points
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 5), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
-                    alpha = 0.3, size = 0.2) +
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
-        ) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-        ) +
-        
-        # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000","C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanWelfChange),
-                  color = "#ba7a31", linewidth = 0.7) +
-        
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanWelfChange),
-                  color = "#264f78", size = 0.7)+
-        
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period))+
-        
-        # Labels and styling
-        labs(x = "Period", y = "Welfare Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$sumWelfChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
-        facet_wrap(~ region)+
-        theme_minimal() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 10,
-      height = 8
-      
-    )
-  }
-  
-#---------------------End 3.2 reg plots ene aggregated------------------------
   
   
   
@@ -1145,47 +869,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   
 #------------------4. Plot by individual channel:Global (welfare change)--------
-  
-  if(any(plotlist=='welfByDecileSec')| allExport ){
-    
-    plotdf <- plotdataWelf %>%
-      filter( period <= 2100,
-              category != 'Consumption With NeutTransf') %>%
-      mutate( category = factor(category, levels = allSec ))
 
-    
-    # Automate over all scenarios
-    p[['welfByDecileSec']] <- list(
-      plot = ggplot(plotdf, 
-                    aes(x = factor(decileGroup), y = decilWelfChange, fill = category)) +
-        geom_boxplot(aes(group = interaction(factor(decileGroup), category)),
-                     outlier.shape = NA, color = "gray40") +
-        
-        # geom_jitter(aes(color = category),
-        #             position = position_jitterdodge(jitter.width = 1, dodge.width =0.75), 
-        #             alpha = 0.3, size = 0.2) +
-        #scale_fill_viridis_d(option = "A") +
-        scale_fill_manual(values = mySecPalette) +
-        facet_wrap(~scenario, ncol = 2) +
-        # Labels and styling
-        labs(x = "Decile", y = "Real Consumption Change (%)", fill = "FE category") +
-        coord_cartesian(ylim = quantile(plotdataWelf$decilWelfChange, probs = c(0.01, 0.99), na.rm = TRUE)) +
-        theme_minimal() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 10,
-      height = 5
-      
-    )
-  }
-  
   if(any(plotlist=='globalWelfBySec')| allExport ){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
+    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
                                          secLevel = c("fullSec"), scope = 'global') %>%
       filter(category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
@@ -1206,7 +893,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                    )) +
         labs(
           x = "Year",
-          y = "Real Consumption Change (%)",
+          y = "Contribution to COLI change (log points)",
           fill = "Category"
         ) +
         theme_minimal() +
@@ -1228,11 +915,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
     plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
                                          secLevel = c("all"), scope = 'region') %>%
-      filter(category %in% c(foodSec,eneSec ) ) %>%
+      filter(category %in% c(foodSec,eneSec) ) %>%
       mutate(category = factor(category, levels = c(foodSec,eneSec)))
-    
 
-    
     # Automate over all scenarios
     p[['regionalWelfBySec']] <- list(
       plot = ggplot(plotdf, aes(x = factor(period), y = welfChange, fill = category)) +
@@ -1242,7 +927,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                    scales = "free_y") +
         labs(
           x = "Year",
-          y = "Real Consumption Change (%)",
+          y = "Contribution to COLI change (log points)",
           fill = "Category"
         ) +
         theme_minimal() +
@@ -1267,49 +952,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
 #---------------4.1 Plot by individual channel:regional (welfare Change)--------
   
-
-  if(any(plotlist == 'welfByDecileSecReg' | allExport  )){
-    
-    plotdf <- plotdataWelf %>%
-      filter( period <= 2100,
-              region == exampleReg) %>%
-      mutate( category = factor(category, levels = allSec))
-    
-    
-    # Automate over all scenarios
-    p[[paste0('welfByDecileSec',exampleReg)]] <- list(
-      plot = ggplot(plotdf, 
-      aes(x = factor(decileGroup), y = decilWelfChange, fill = category)) +
-        geom_boxplot(aes(group = interaction(factor(decileGroup), category)),
-                     outlier.shape = NA, color = "gray40") +
-        
-        # geom_jitter(aes(color = category),
-        #             position = position_jitterdodge(jitter.width = 1, dodge.width =0.75), 
-        #             alpha = 0.3, size = 0.2) +
-        scale_fill_manual(values = mySecPalette) +
-        facet_wrap(~scenario, ncol = 2) +
-        # Labels and styling
-        labs(x = "Decile", y = "Welfare Change (%)", fill = "FE category") +
-        coord_cartesian(ylim = quantile(plotdataWelf$decilWelfChange, probs = c(0.01, 0.99), na.rm = TRUE)) +
-        theme_minimal() +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        ),
-      
-      width = 8,
-      height = 3
-      
-    )
-    
-  }
   
 
   
   if(any(plotlist == 'regWelfBySec' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
+    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
                                          secLevel = c("fullSec"), scope = 'region') %>%
       filter(category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
@@ -1334,7 +982,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           facet_wrap(~ region) +
           labs(
             x = "Year",
-            y = "Welfare Change (%)",
+            y = "Contribution to COLI change (log points)",
             fill = "Category"
           ) +
           theme_minimal() +
@@ -1510,9 +1158,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
         labs(x = "Year", y = "Gini change from reference (points)", fill = "FE category") +
-        #coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
-        ylim(-1,2.2) + 
-
+        coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
+        #ylim(-1,2.2) + 
         theme(axis.title.x = element_blank())
       ,
       
@@ -3136,7 +2783,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'secBurdenByGlobalDecile' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = plotdataWelf, data2 = data2, 
+    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
                                          secLevel = c("fullSec"), scope = 'globalDecile') %>%
       filter(period %in% c('2030','2050','2100'),
              category != 'Other commodities') %>%
@@ -3154,7 +2801,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         labs(
           title = scenario_labels[scen],
           x = "Income decile group",
-          y = "Real Consumption Change (%)",
+          y = "Contribution to COLI change (log points)",
           fill = "Category"
         ) +
         #scale_fill_paletteer_d("NatParksPalettes::Olympic",direction = -1) +
@@ -3211,7 +2858,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         labs(
           title = scenario_labels[scen],
           x = "Income decile group",
-          y = "Real Consumption Change (%)",
+          y = "Contribution to COLI change (log points)",
           fill = "Category"
         ) +
         #scale_fill_paletteer_d("ggprism::floral2") +

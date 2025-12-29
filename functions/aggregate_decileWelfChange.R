@@ -6,7 +6,7 @@ aggregate_decileWelfChange <- function(
     scope = c("region", "global", "decile", "globalDecile"),
     weightScenario = "C_SSP2-NPi2025",          
     weightCol = "consumptionCa"    
-) {
+    ) {
   secLevel <- match.arg(secLevel)
   scope    <- match.arg(scope)
   
