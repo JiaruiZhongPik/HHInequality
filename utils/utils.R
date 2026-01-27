@@ -90,14 +90,7 @@ compute_theil.wtd <- function(x, weights = NULL, type = c("T", "L")) {
   return(theil)
 }
 
-add_region_tag <- function(df, regressRegGrouping, regionMapping = NULL) {
-  if (regressRegGrouping == "pool") {
-    df %>% dplyr::mutate(region = "pool")
-  } else {
-    if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
-    df %>% dplyr::left_join(regionMapping, by = "geo")
-  }
-}
+
 
 logit <- function(p, eps = 1e-9) {
   p <- pmin(pmax(p, eps), 1 - eps)

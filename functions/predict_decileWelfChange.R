@@ -5,6 +5,7 @@
 #-------------1. First-order welfare effect-------------------------
 
 predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, 
+                                     taxBase = 'CO2woLUC',
                                      climaFund = 0,
                                      fund_return_scale = 1,
                                      payg = 1,
@@ -150,7 +151,6 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
       
       
     } else if (fixed_point == 'midpoint') {
-      
 
       baseConsShare <- data2 %>%
         filter(
@@ -210,10 +210,13 @@ predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare,
   #Compute transfer
 
   transferEpc <- compute_transfer(data1 = data1, data2 = data2, 
+                                  taxBase = taxBase,
                                   climaFund = climaFund, fund_return_scale = fund_return_scale, 
                                   payg = payg,
                                   recycle ='epc')
+  
   transferNeut <- compute_transfer(data1 = data1, data2 = data2, 
+                                   taxBase = taxBase,
                                    climaFund = climaFund, fund_return_scale = fund_return_scale,
                                    payg = payg,
                                    recycle ='neut')

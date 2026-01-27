@@ -165,11 +165,7 @@ compute_inequalityMetrics <- function(data1 = decileWelfChange,
   
   #--------Compute categorical impacts for regions-------------------------------
   
-  # welfByDecileSec <- aggregate_decileWelfChange(data1 = decileWelfChange, 
-  #                                               data2 = decileConsShare, 
-  #                                               secLevel = c("fullSec"), 
-  #                                               scope = 'decile')
-  
+
   #Step1:channel-wise shock
   df <- consBase %>%
     merge(

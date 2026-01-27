@@ -2,16 +2,26 @@
 
 
 
-plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist='NA' , micro_model, fixed_point, exampleReg = 'EUR', isDisplay = T, isExport = FALSE, allExport=FALSE ) {
+plot_output <- function(outputPath, 
+                        decileWelfChange,  
+                        decileConsShare,
+                        data,
+                        anchRealCons,
+                        ineqAll,
+                        ineqChannel,
+                        plotlist='NA' , micro_model, fixed_point, 
+                        exampleReg = 'EUR', isDisplay = T, 
+                        isExport = FALSE, allExport=FALSE ) {
   
-  data1 <- data1 %>%
-    filter(period %notin% c(2010,2110,2130,2150)) 
+  dfDecileWelfChange <- decileWelfChange %>% dplyr::filter(period <= 2100)
+  dfDecileConsShare  <- decileConsShare  %>% dplyr::filter(period <= 2100)
+  dfData             <- data             %>% dplyr::filter(period <= 2100)
+  dfAnchRealCons     <- anchRealCons     %>% dplyr::filter(period <= 2100)
+  dfIneqAll <- purrr::map( ineqAll,
+    ~ dplyr::filter(.x, period <= 2100)
+  )
+  dfIneqChannel      <- ineqChannel      %>% dplyr::filter(period <= 2100)
   
-  data2 <- data2 %>%
-    filter(period %notin% c(2010,2110,2130,2150)) 
-  
-  data3 <- data3 %>%
-    filter(period %notin% c(2010,2110,2130,2150)) 
   
 
   
@@ -49,11 +59,18 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   eneSec <- c("Building electricity", "Building gases", "Building other fuels","Transport energy")
   allSec <- c(foodSec,eneSec, 'Consumption')
   
+  scenario_levels <- c(
+    "C_SSP2-PkBudg1000",
+    "C_SSP2-PkBudg650",
+    "C_SSP2-loOS-def", 
+    "C_SSP2-hiOS-def" 
+  )
+  
   scenario_labels <- c(
-    "C_SSP2-PkBudg1000" = "SSP2-2°C",
-    "C_SSP2-PkBudg650"  = "SSP2-1.5°C",
-    "C_SSP2-hiOS-def"   = "SSP2-1.5°C HO",
-    "C_SSP2-loOS-def"   = "SSP2-1.5°C LO"
+    "C_SSP2-PkBudg1000" = "2°C",
+    "C_SSP2-PkBudg650"  = "1.5°C",
+    "C_SSP2-hiOS-def"   = "1.5°C HO",
+    "C_SSP2-loOS-def"   = "1.5°C LO"
   )
   
   mySecPalette <- rev(c("#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
@@ -67,51 +84,36 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     "C_SSP2-loOS-def"   = "#779ec6"   # 1.5°C LO (same as 650)
   )
   
+  regSelect <- c('CHA', 'EUR', 'IND', 'LAM', 'SSA', 'USA')
+  
+  period <- unique(dfDecileConsShare$period)
+  
   p=list()
 
 #-------------------------1.Plots all aggregated welfare change------------------------
   
   if(any(plotlist == "welfByPeriodNeut") | allExport){
-    #todo: is using weighted average better?
-    
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfNeut",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    ) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
 
-    avg_df_period <- dataDecile %>%
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario,period,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+
+    avg_df_period <- plotdf %>%
       group_by(scenario, period) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
       
     
     p[['welfByPeriodNeut']] <- list(
       
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                   aes(x = period, y = relChange, fill = scenario)) +
+      plot = ggplot( plotdf, 
+                     aes(x = period, y = relChange_pc_vs_base, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
                      position = position_dodge(width = 3), width = 3,
                      outlier.shape = NA, color = "gray40") +
-        
         # Mean points
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
@@ -121,119 +123,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                     position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
                     alpha = 0.3, size = 0.2) +
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67",
-                     "C_SSP2-loOS-def" = "#264f78"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          ) +
-        
-        # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-hiOS-def"), period >= 2025),
-                  aes(x = period + 1, y = meanRelChange),
-                  color = "#ba7a31", linewidth = 0.7) +
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
-                  aes(x = period - 1, y = meanRelChange),
-                  color = "#264f78", linewidth = 0.7)+
-        
-        #  Custom color mapping for boxes and lines
-        scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67", 
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def"  = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
-        
-        # Labels and styling
-        labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE))
-        # + theme_minimal()
-        # + theme(
-        #   axis.text.x = element_text(angle = 45, hjust = 1),
-        #   legend.position = "bottom",
-        #   legend.direction = "horizontal",
-        #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-        #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-        #   panel.grid.minor = element_blank(),
-        #   panel.background = element_rect(fill = "white", color = NA)
-        # )
-      ,
-      
-      width = 5,
-      height = 3
-      
-    )
-  
-    
-    
-    }
-  
-  if(any(plotlist == "welfByPeriodEpc") | allExport){
-    #todo: is using weighted average better?
-    
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfEpc",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    ) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
-    
-    avg_df_period <- dataDecile %>%
-      group_by(scenario, period) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
-    
-    
-    p[['welfByPeriodEpc']] <- list(
-      
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = relChange, fill = scenario)) +
-        
-        # Side-by-side boxplots per scenario and period
-        geom_boxplot(aes(group = interaction(period, scenario)), 
-                     position = position_dodge(width = 3), width = 3,
-                     outlier.shape = NA, color = "gray40") +
-        
-        # Mean points
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 5), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
-                    alpha = 0.3, size = 0.2) +
-        scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67",
-                     "C_SSP2-loOS-def" = "#264f78"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         
         # One-by-one geom_line for each scenario
@@ -254,22 +145,82 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                      "C_SSP2-PkBudg650"  = "1.5°C",
                      "C_SSP2-hiOS-def" = "1.5°C HO",
                      "C_SSP2-loOS-def" = "1.5°C LO")) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks =  period,
+                           labels =  period) +
         
         # Labels and styling
         labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE))
-      # + theme_minimal()
-      # + theme(
-      #   axis.text.x = element_text(angle = 45, hjust = 1),
-      #   legend.position = "bottom",
-      #   legend.direction = "horizontal",
-      #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-      #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-      #   panel.grid.minor = element_blank(),
-      #   panel.background = element_rect(fill = "white", color = NA)
-      # )
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.01, 0.99), na.rm = TRUE))
+      ,
+      
+      width = 5,
+      height = 3
+      
+    )
+  
+    
+    
+    }
+  
+  if(any(plotlist == "welfByPeriodEpc") | allExport){
+    
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario,period,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    avg_df_period <- plotdf %>%
+      group_by(scenario, period) %>%
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    
+    p[['welfByPeriodEpc']] <- list(
+      
+      plot = ggplot( plotdf, 
+                     aes(x = period, y = relChange_pc_vs_base, fill = scenario)) +
+        
+        # Side-by-side boxplots per scenario and period
+        geom_boxplot(aes(group = interaction(period, scenario)), 
+                     position = position_dodge(width = 3), width = 3,
+                     outlier.shape = NA, color = "gray40") +
+        # Mean points
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 5), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 1.5, dodge.width = 5), 
+                    alpha = 0.3, size = 0.2) +
+        scale_color_manual(
+          values = myScenPalette,
+          labels = scenario_labels
+        ) +
+        
+        # One-by-one geom_line for each scenario
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650", "C_SSP2-hiOS-def"), period >= 2025),
+                  aes(x = period + 1, y = meanRelChange),
+                  color = "#ba7a31", linewidth = 0.7) +
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+                  aes(x = period - 1, y = meanRelChange),
+                  color = "#264f78", linewidth = 0.7)+
+        
+        #  Custom color mapping for boxes and lines
+        scale_fill_manual(
+          values = c("C_SSP2-PkBudg1000" = "#e8ab67", 
+                     "C_SSP2-PkBudg650"  = "#779ec6",
+                     "C_SSP2-hiOS-def" = "#e8ab67", 
+                     "C_SSP2-loOS-def"  = "#779ec6"),
+          labels = c("C_SSP2-PkBudg1000" = "2°C",
+                     "C_SSP2-PkBudg650"  = "1.5°C",
+                     "C_SSP2-hiOS-def" = "1.5°C HO",
+                     "C_SSP2-loOS-def" = "1.5°C LO")) +
+        scale_x_continuous(breaks =  period,
+                           labels =  period) +
+        
+        # Labels and styling
+        labs(x = "Year", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.01, 0.99), na.rm = TRUE))
       ,
       
       width = 5,
@@ -283,26 +234,20 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == "welfByDecileNeut") | allExport){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = decileWelfChange,
-      data2 = decileConsShare,
-      secLevel = "totalWithTransfNeut",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    ) %>% filter(period <= 2100)
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario, decileGroup ,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    avg_df_decile <- dataDecile %>%
+    avg_df_decile <- plotdf %>%
       group_by(scenario, decileGroup) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByDecileNeut"]] <- list (
       
-      plot = ggplot(dataDecile, 
-                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
         
         geom_boxplot(outlier.shape = NA, width = 0.4, 
                      position = position_dodge(width = 0.5), color = "grey20") +
@@ -322,69 +267,48 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                      shape = 20, size = 2.5, color = "gray30") +
         
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         
-        
-        labs(x = "Income Decile Group", y = "Real consumpition Change to NPi(%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real consumpition Change(%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
           legend.direction = "horizontal"
-        ),
+        )
+      ,
       
-      width = 5,
-      height = 3 
+      width = 6,
+      height = 4 
       
     )
     
   }
-  
   
   if(any(plotlist == "welfByDecileEpc") | allExport){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = decileWelfChange,
-      data2 = decileConsShare,
-      secLevel = "totalWithTransfEpc",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    )
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario, decileGroup ,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    avg_df_decile <- dataDecile %>%
+    avg_df_decile <- plotdf %>%
       group_by(scenario, decileGroup) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByDecileEpc"]] <- list (
       
-      plot = ggplot(dataDecile, 
-                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
         
         geom_boxplot(outlier.shape = NA, width = 0.4, 
                      position = position_dodge(width = 0.5), color = "grey20") +
@@ -404,38 +328,86 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                      shape = 20, size = 2.5, color = "gray30") +
         
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         
-        
-        labs(x = "Income Decile Group", y = "Real consumpition Change to NPi (%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real consumpition Change(%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
           legend.direction = "horizontal"
-        ),
+        )
+      ,
+      
+      width = 6,
+      height = 4 
+      
+    )
+    
+  }
+  
+  if(any(plotlist == "welfByDecileEpcLowInc") | allExport){
+    
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC',
+             region %in% c('LAM','SSA','REF','IND','OAS','MEA','CHA')) %>%
+      select(scenario, decileGroup ,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    avg_df_decile <- plotdf %>%
+      group_by(scenario, decileGroup) %>%
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    p[["welfByDecileEpcLowInc"]] <- list (
+      
+      plot = ggplot(plotdf, 
+                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
+        
+        geom_boxplot(outlier.shape = NA, width = 0.4, 
+                     position = position_dodge(width = 0.5), color = "grey20") +
+        
+        geom_jitter(aes(color = scenario),
+                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
+                    alpha = 0.3, size = 0.2) +
+        
+        # 🔹 Add mean lines by scenario
+        geom_line(data = avg_df_decile, 
+                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
+                  linewidth = 0.7) +
+        
+        stat_summary(fun = mean, geom = "point", 
+                     aes(group = scenario), 
+                     position = position_dodge(width = 0.7), 
+                     shape = 20, size = 2.5, color = "gray30") +
+        
+        scale_fill_manual(
+          values = myScenPalette,
+          labels = scenario_labels
+        ) +
+        
+        scale_color_manual(
+          values = myScenPalette,
+          labels = scenario_labels
+        ) +
+        
+        labs(x = "Income Decile Group", y = "Real consumpition Change(%)", fill = "Scenario", color = "Scenario") +
+        theme_minimal() +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        theme(
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom",
+          legend.direction = "horizontal"
+        )
+      ,
       
       width = 5,
       height = 3 
@@ -444,113 +416,205 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
+  if(any(plotlist == "welfByPeriodShaded") | allExport){
+    
+    dataDecileNeut <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario,period,region,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    dataDecileEpc <-     plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario,period,region,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    loPattern <- "loOS"   # low overshoot scenarios contain this substring
+    hoPattern <- "hiOS"   # high overshoot scenarios contain this substring
+    
+    dataDecile <- bind_rows(
+      dataDecileNeut %>% mutate(transfer = "Neut"),
+      dataDecileEpc  %>% mutate(transfer = "EPC")
+    ) %>%
+      mutate(
+        scenario = case_when(
+          str_detect(as.character(scenario), loPattern) ~ "1.5°C LO",
+          str_detect(as.character(scenario), hoPattern) ~ "1.5°C HO",
+          TRUE ~ NA_character_
+        ),
+        scenario = factor(scenario, levels = c("1.5°C LO", "1.5°C HO")),
+        transfer  = factor(transfer,  levels = c("Neut", "EPC")),
+        period    = as.integer(period)
+      ) 
+    
+    plotdf <- dataDecile %>%
+      # group_by(period, scenario, region, transfer) %>%
+      # summarise(relChange_pc_vs_base = mean(relChange_pc_vs_base, na.rm =T)) %>%
+      group_by(period, scenario, transfer) %>%
+      summarise(
+        med = median(relChange_pc_vs_base, na.rm = TRUE),
+        p25 = quantile(relChange_pc_vs_base, 0.25, na.rm = TRUE),
+        p75 = quantile(relChange_pc_vs_base, 0.75, na.rm = TRUE),
+        mean = mean(relChange_pc_vs_base, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    
+    p[['welfByPeriodShaded']] <- list(
+      
+      plot = ggplot(
+        plotdf,
+        aes(x = period, y = med, color = scenario, linetype = transfer, group = interaction(scenario, transfer))
+      ) +
+        # optional: show where transfer tends to lose relevance (adjust if you want)
+        annotate("rect", xmin = 2070, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.06) +
+        geom_hline(yintercept = 0, linewidth = 0.4) +
+        geom_ribbon(aes(ymin = p25, ymax = p75, fill = scenario), alpha = 0.12, color = NA, show.legend = FALSE) +
+        geom_line(linewidth = 1.0) +
+        geom_point(size = 2) +
+        scale_color_manual(
+          values = c(
+            "1.5°C LO" = "#779ec6",
+            "1.5°C HO" = "#e8ab67"
+          )
+        ) +
+        scale_fill_manual(
+          values = c(
+            "1.5°C LO" = "#779ec6",
+            "1.5°C HO" = "#e8ab67"
+          )
+        )+
+        scale_x_continuous(breaks = sort(unique(plotdf$period))) +
+        labs(
+          x = "Year",
+          y = "Real consumption change (%)",
+          color = "Scenario",
+          linetype = "Transfers"
+          #subtitle = "All income deciles"
+        ) +
+        theme_bw() +
+        theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+              axis.text.x = element_text(angle = 45, hjust = 1))
+      ,
+      
+      width = 6,
+      height = 4
+      
+    )
+    
+    
+    
+  }
+  
+  if(any(plotlist == "welfByPeriodShadedD1") | allExport){
+    
+    dataDecileNeut <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario,period,region,decileGroup,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    dataDecileEpc <-     plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario,period,region,decileGroup,relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
+    loPattern <- "loOS"   # low overshoot scenarios contain this substring
+    hoPattern <- "hiOS"   # high overshoot scenarios contain this substring
+    
+    dataDecile <- bind_rows(
+      dataDecileNeut %>% mutate(transfer = "Neut"),
+      dataDecileEpc  %>% mutate(transfer = "EPC")
+    ) %>%
+      filter(decileGroup == 1) %>%
+      mutate(
+        scenario = case_when(
+          str_detect(as.character(scenario), loPattern) ~ "1.5°C LO",
+          str_detect(as.character(scenario), hoPattern) ~ "1.5°C HO",
+          TRUE ~ NA_character_
+        ),
+        scenario = factor(scenario, levels = c("1.5°C LO", "1.5°C HO")),
+        transfer  = factor(transfer,  levels = c("Neut", "EPC")),
+        period    = as.integer(period)
+      ) 
+    
+    plotdf <- dataDecile %>%
+      group_by(period, scenario, region, transfer) %>%
+      summarise(relChange_pc_vs_base = mean(relChange_pc_vs_base, na.rm =T)) %>%
+      group_by(period, scenario, transfer) %>%
+      summarise(
+        med = median(relChange_pc_vs_base, na.rm = TRUE),
+        p25 = quantile(relChange_pc_vs_base, 0.25, na.rm = TRUE),
+        p75 = quantile(relChange_pc_vs_base, 0.75, na.rm = TRUE),
+        mean = mean(relChange_pc_vs_base, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    
+    p[['welfByPeriodShadedD1']] <- list(
+      
+      plot = ggplot(
+        plotdf,
+        aes(x = period, y = med, color = scenario, linetype = transfer, group = interaction(scenario, transfer))
+      ) +
+        # optional: show where transfer tends to lose relevance (adjust if you want)
+        annotate("rect", xmin = 2070, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.06) +
+        geom_hline(yintercept = 0, linewidth = 0.4) +
+        geom_ribbon(aes(ymin = p25, ymax = p75, fill = scenario), alpha = 0.12, color = NA, show.legend = FALSE) +
+        geom_line(linewidth = 1.0) +
+        geom_point(size = 1.8) +
+        scale_color_manual(
+          values = c(
+            "1.5°C LO" = "#779ec6",
+            "1.5°C HO" = "#e8ab67"
+          )
+        ) +
+        scale_fill_manual(
+          values = c(
+            "1.5°C LO" = "#779ec6",
+            "1.5°C HO" = "#e8ab67"
+          )
+        ) +
+        scale_x_continuous(breaks = sort(unique(plotdf$period))) +
+        labs(
+          x = "Year",
+          y = "Real consumption change (%)",
+          color = "Scenario",
+          linetype = "Transfers",
+          subtitle = "All income deciles"
+        ) +
+        theme_bw() +
+        theme(legend.position = "bottom", panel.grid.minor = element_blank())
+      ,
+      
+      width = 5,
+      height = 3
+      
+    )
+    
+    
+  }
   
 #---------------------End:Plots all aggregated----------------------------------  
 
   
 
-
-#----------2.3. contribution food and energy aggregated(welfare change)---------
-# 
-#   if(any(plotlist=="foodEneContribution")| allExport ){
-#     
-#     df <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-#                                secLevel = c("groupedSec"), scope = 'global') %>%
-#       filter(category != 'Other commodities')
-#     
-#     plotdf <- df %>%
-#       filter(period <= 2100,
-#              category %in% foodSec) %>%
-#       group_by(scenario, period) %>%
-#       summarise(foodShare = sum(welfChange, na.rm = TRUE), .groups = "drop") 
-#     
-#     plotdf <- df %>%
-#       filter(period <= 2100,
-#              category %in% eneSec) %>%
-#       group_by(scenario, period) %>%
-#       summarise(eneShare = sum(welfChange, na.rm = TRUE), .groups = "drop") %>%
-#       left_join(plotdf, by=c('scenario','period')) %>%
-#       pivot_longer(cols = c('eneShare','foodShare'), names_to = 'category',
-#                    values_to = 'value') %>%
-#       group_by(scenario, period) %>%
-#       mutate(
-#         value = value / sum(value, na.rm = TRUE),
-#         value = ifelse(is.na(value), 0, value)
-#       ) %>%
-#       ungroup() %>%
-#       mutate(scenario = factor(scenario, levels = c(
-#         "C_SSP2-PkBudg1000",
-#         "C_SSP2-PkBudg650",
-#         "C_SSP2-loOS-def", 
-#         "C_SSP2-hiOS-def" 
-#       )))
-#     
-#     # Automate over all scenarios
-#     p[['foodEneContribution']] <- list(
-#       plot =
-#         ggplot(plotdf, aes(x = period, y = value, fill = category)) +
-#         geom_col(position = "stack") +
-#         facet_wrap(~ scenario, ncol = 2,
-#                    labeller = as_labeller(
-#                      c("C_SSP2-PkBudg1000" = "2°C",
-#                        "C_SSP2-PkBudg650"  = "1.5°C",
-#                        "C_SSP2-loOS-def"  = "1.5°C LO",
-#                        "C_SSP2-hiOS-def" = "1.5°C HO"
-#                        )
-#                    )) +
-#         labs(
-#           x = "Year",
-#           y = "Real Consumption Change (%)",
-#           fill = "Category"
-#         ) +
-#         scale_fill_paletteer_d("ButterflyColors::astraptes_fulgerator",
-#                                labels = c("foodShare" = "Food",
-#                                           "eneShare"  = "Energy")) +
-#         guides(fill = guide_legend(reverse = TRUE)) +
-#         scale_x_continuous(breaks = unique(plotdataWelf$period),
-#                            labels = unique(plotdataWelf$period))
-#         
-#       ,
-#       
-#       width = 8,
-#       height = 3
-#       
-#     )
-#   }
-#   
+#-------------------------2.reg plots all aggregated(welfare change)------------  
   
-    
-#---------------------End:Plots Ene aggregated----------------------------------  
-  
-    
-  
-  
-  
-#-------------------------3.reg plots all aggregated(welfare change)------------  
   if(any(plotlist == "welfByDecileRegNeut") | allExport){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfNeut",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    )
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario, period, region, decileGroup, relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    
-    avg_df_decile <- dataDecile %>%
-      group_by(scenario, decileGroup,region) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
-    
+    avg_df_decile <- plotdf %>%
+      group_by(scenario,decileGroup, region) %>%
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByDecileRegNeut"]] <- list(
       
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
         geom_boxplot(outlier.shape = NA, width = 0.5, 
                      position = position_dodge(width = 0.6), color = "grey20") +
         geom_jitter(aes(color = scenario),
@@ -562,26 +626,14 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                   aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
                   size = 0.7) +
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
+          values = myScenPalette,
           
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          labels = scenario_labels
           
         ) +
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
@@ -591,7 +643,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         facet_wrap(~ region)+
         theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.01, 0.99), na.rm = TRUE)) +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
@@ -606,28 +658,22 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == "welfByDecileRegEpc") | allExport){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfEpc",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    )
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario, period, region, decileGroup, relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
+    avg_df_decile <- plotdf %>%
+      group_by(scenario,decileGroup, region) %>%
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    avg_df_decile <- dataDecile %>%
-      group_by(scenario, decileGroup,region) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop") %>%
-      mutate(decileGroup = as.factor(decileGroup)) 
     
     
     p[["welfByDecileRegEpc"]] <- list(
       
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = factor(decileGroup), y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
         geom_boxplot(outlier.shape = NA, width = 0.5, 
                      position = position_dodge(width = 0.6), color = "grey20") +
         geom_jitter(aes(color = scenario),
@@ -639,26 +685,14 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                   aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
                   size = 0.7) +
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
+          values = myScenPalette,
           
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          labels = scenario_labels
           
         ) +
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         stat_summary(fun = mean, geom = "point", 
                      aes(group = scenario), 
@@ -668,7 +702,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         labs(x = "Income Decile Group", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
         facet_wrap(~ region)+
         theme_minimal() +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.02, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.01, 0.99), na.rm = TRUE)) +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
@@ -683,24 +717,20 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist=='welfByPeriodRegNeut')| allExport ){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfNeut",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    )
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'Neut') %>%
+      select(scenario, period, region, decileGroup, relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    avg_df_period <- dataDecile %>%
+    avg_df_period <- plotdf %>%
       group_by(scenario, period, region) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop")
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
+    
     
     p[["welfByPeriodRegNeut"]] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = period, y = relChange_pc_vs_base, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
@@ -718,42 +748,28 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                     alpha = 0.3, size = 0.2) +
 
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanRelChange),
                   color = "#ba7a31", size = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-hiOS-def"), period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanRelChange),
                   color = "#264f78", size = 0.7)+
       
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         
         # Labels and styling
         labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
         theme(
@@ -768,28 +784,22 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     )
     
   }
-  
   
   if(any(plotlist=='welfByPeriodRegEpc')| allExport ){
     
-    dataDecile <- aggregate_decileWelfChange(
-      data1 = data1,
-      data2 = data2,
-      secLevel = "totalWithTransfEpc",
-      scope = "decile",
-      weightScenario = "C_SSP2-NPi2025",          
-      weightCol = "consumptionCa"    
-    ) %>% mutate(
-      relChange = (exp(welfChange/100) - 1)*100 
-    )
+    plotdf <- dfAnchRealCons %>% 
+      filter(scheme == 'EPC') %>%
+      select(scenario, period, region, decileGroup, relChange_pc_vs_base) %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    avg_df_period <- dataDecile %>%
+    avg_df_period <- plotdf %>%
       group_by(scenario, period, region) %>%
-      summarise(meanRelChange = mean(relChange, na.rm = TRUE), .groups = "drop")
+      summarise(meanRelChange = mean(relChange_pc_vs_base, na.rm = TRUE), .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByPeriodRegEpc"]] <- list(
-      plot = ggplot(dataDecile %>% filter(period <= 2100), 
-                    aes(x = period, y = relChange, fill = scenario)) +
+      plot = ggplot(plotdf, 
+                    aes(x = period, y = relChange_pc_vs_base, fill = scenario)) +
         
         # Side-by-side boxplots per scenario and period
         geom_boxplot(aes(group = interaction(period, scenario)), 
@@ -807,49 +817,36 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                     alpha = 0.3, size = 0.2) +
         
         # One-by-one geom_line for each scenario
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-loOS-def"), period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg1000", "C_SSP2-hiOS-def"), period >= 2025),
                   aes(x = period - 1, y = meanRelChange),
                   color = "#ba7a31", size = 0.7) +
         
-        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-hiOS-def"), period >= 2025),
+        geom_line(data = avg_df_period %>% filter(scenario %in% c("C_SSP2-PkBudg650","C_SSP2-loOS-def"), period >= 2025),
                   aes(x = period + 1, y = meanRelChange),
                   color = "#264f78", size = 0.7)+
         
         scale_fill_manual(
-          values = c("C_SSP2-PkBudg1000" = "#e8ab67",  
-                     "C_SSP2-PkBudg650"  = "#779ec6",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
-          
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
         scale_color_manual(
-          values = c("C_SSP2-PkBudg1000" = "#ba7a31",
-                     "C_SSP2-PkBudg650"  = "#264f78",
-                     "C_SSP2-hiOS-def" = "#e8ab67", 
-                     "C_SSP2-loOS-def" = "#779ec6"),
-          labels = c("C_SSP2-PkBudg1000" = "2°C",
-                     "C_SSP2-PkBudg650"  = "1.5°C",
-                     "C_SSP2-hiOS-def" = "1.5°C HO",
-                     "C_SSP2-loOS-def" = "1.5°C LO")
+          values = myScenPalette,
+          labels = scenario_labels
         ) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         
         # Labels and styling
         labs(x = "Period", y = "Real Consumption Change (%)", fill = "Scenario", color = "Scenario") +
-        coord_cartesian(ylim = quantile(dataDecile$relChange, probs = c(0.002, 0.99), na.rm = TRUE)) +
+        coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.002, 0.99), na.rm = TRUE)) +
         facet_wrap(~ region)+
         theme_minimal() +
         theme(
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom",
           legend.direction = "horizontal"
-        ),
+        )
+      ,
       
       width = 10,
       height = 8
@@ -857,30 +854,26 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     )
     
   }
-#-----------------------------End. 3.reg plots all aggregated----------------- 
+  
+#-----------------------------End. 2.reg plots all aggregated------------------- 
   
   
   
   
   
+#-----------3. Plot by individual channel:Global (COLI change log points)-------
   
-  
-  
-  
-  
-#------------------4. Plot by individual channel:Global (welfare change)--------
+  if(any(plotlist=='globalColiBySec')| allExport ){
 
-  if(any(plotlist=='globalWelfBySec')| allExport ){
-    
-    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-                                         secLevel = c("fullSec"), scope = 'global') %>%
+    plotdf <- aggregate_decileWelfChange(data1 =  dfDecileWelfChange,
+                                         data2 = dfDecileConsShare,
+                                         secLevel = c("fullSec"),
+                                         scope = 'global') %>%
       filter(category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
 
-    
-    
     # Automate over all scenarios
-    p[['globalWelfBySec']] <- list(
+    p[['globalColiBySec']] <- list(
       plot = ggplot(plotdf, aes(x = factor(period), y = welfChange, fill = category)) +
         geom_col(position = "stack") +
         geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
@@ -902,24 +895,26 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         scale_fill_manual(values = mySecPalette) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1))+
         guides(fill = guide_legend(reverse = TRUE))
-      
+
       ,
-      
+
       width = 8,
       height = 3
-      
+
     )
   }
 
-  if(any(plotlist=='regionalWelfBySec')| allExport ){
+  if(any(plotlist=='regColiBySec')| allExport ){
     
-    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-                                         secLevel = c("all"), scope = 'region') %>%
+    plotdf <- aggregate_decileWelfChange(data1 =  dfDecileWelfChange, 
+                                         data2 = dfDecileConsShare, 
+                                         secLevel = c("all"), 
+                                         scope = 'region') %>%
       filter(category %in% c(foodSec,eneSec) ) %>%
       mutate(category = factor(category, levels = c(foodSec,eneSec)))
 
     # Automate over all scenarios
-    p[['regionalWelfBySec']] <- list(
+    p[['regColiBySec']] <- list(
       plot = ggplot(plotdf, aes(x = factor(period), y = welfChange, fill = category)) +
         geom_col(position = "stack") +
         geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
@@ -934,7 +929,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         scale_fill_manual(values = mySecPalette) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         guides(fill = guide_legend(reverse = TRUE))
-      
       ,
       
       width = 8,
@@ -942,25 +936,66 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
     )
   }
-#--------------------END. 4. Plot by individual channel:Global-----------------
+  
+  if(any(plotlist=='regColiBySecSelect')| allExport ){
 
-  
-  
-  
-  
-  
-      
-#---------------4.1 Plot by individual channel:regional (welfare Change)--------
-  
-  
-
-  
-  if(any(plotlist == 'regWelfBySec' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-                                         secLevel = c("fullSec"), scope = 'region') %>%
+    plotdfWorld <- aggregate_decileWelfChange(data1 =  dfDecileWelfChange,
+                                         data2 = dfDecileConsShare,
+                                         secLevel = c("fullSec"),
+                                         scope = 'global') %>%
       filter(category != 'Other commodities') %>%
-      mutate(category = factor(category, levels = allSec))
+      mutate(category = factor(category, levels = c(foodSec,eneSec)),
+             region = 'World')
+    
+    plotdfReg <- aggregate_decileWelfChange(data1 =  dfDecileWelfChange, 
+                                         data2 = dfDecileConsShare, 
+                                         secLevel = c("fullSec"), 
+                                         scope = 'region') %>%
+      filter(category != 'Other commodities',
+             region %in% regSelect) %>%
+      mutate(category = factor(category, levels = c(foodSec,eneSec)))
+    
+    plotdf <- plotdfWorld %>%
+      rbind(plotdfReg) %>%
+      mutate(region = factor(region, levels = c('World',regSelect)))
+    
+    # Automate over all scenarios
+    p[['regColiBySecSelect']] <- list(
+      plot = ggplot(plotdf %>% filter(region != 'World'), aes(x = period, y = - welfChange, fill = category)) +
+        geom_area(position = "stack", alpha = 0.9) +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+        facet_grid(
+          region ~ scenario,
+          scales = "free_y",
+          labeller = labeller(scenario = as_labeller(scenario_labels))
+        ) +
+        scale_x_continuous(breaks = sort(unique(plotdf$period))) +
+        scale_fill_manual(values = mySecPalette) +
+        labs(
+          x = "Year",
+          y = "Contribution to COLI change (log points)",
+          fill = "Category"
+        ) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        guides(fill = guide_legend(reverse = TRUE))
+      ,
+      
+      width = 8,
+      height = 8
+      
+    )
+  }
+  
+  if(any(plotlist == 'regColiBySec' | allExport  )){
+    
+    plotdf <- aggregate_decileWelfChange(data1 =  dfDecileWelfChange, 
+                                         data2 = dfDecileConsShare, 
+                                         secLevel = c("all"), 
+                                         scope = 'region') %>%
+      filter(category %in% c(foodSec,eneSec) ) %>%
+      mutate(category = factor(category, levels = c(foodSec,eneSec)))
     
 
     for(n in unique(plotdf$scenario)) {
@@ -998,25 +1033,20 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
 }
       
-#----------End 4.1 Plot by individual channel:regional (welfare change)---------
+#----------End 3 Plot by individual channel:regional (COLI change log points)---------
    
 
   
   
   
   
-#----------------------5.1 global inequality effect (Gini/Theil)----------------
-  
+#----------------------4 global inequality effect (Gini/Theil)----------------
   
   if(any(plotlist == 'ineqWorld_Gini' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter(
-        period <= 2100,
-        region == "World",
-        category %in% c("TotalWithTransfNeut", "Reference", "TotalWithTransfEpc"),
-        variable %in% c("ineq|Gini")
-      )
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region == 'World',
+             variable == "ineq|Gini")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025")
@@ -1033,8 +1063,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         )
       )
 
-
-    
   
     # Automate over all scenarios
     p[['ineqWorld_Gini']] <- list(
@@ -1044,14 +1072,11 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         geom_line() + 
         facet_wrap(~scenario, ncol = 2,
                    labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-hiOS-def" = "1.5°C HO",
-                       "C_SSP2-loOS-def"  = "1.5°C LO")
+                     scenario_labels
                    )
                    ) +
         # Labels and styling
-        labs(x = "Year", y = "Inequality metrics", fill = "FE category") +
+        labs(x = "Year", y = "Inequality metrics") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
         # unified legend for both color + linetype (same variable, same breaks, same labels)
         
@@ -1097,19 +1122,14 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
     )
     
-    
       
   }
   
-  
-  
   if(any(plotlist == 'ineqWorldWithTransf_GiniRela' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region == 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|Gini'))
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region == 'World',
+             variable == "ineq|Gini")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025") %>%
@@ -1141,20 +1161,15 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           values = myScenPalette,
           breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
                      "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
-          labels = c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def"   = "1.5°C HO",
-            "C_SSP2-loOS-def"   = "1.5°C LO"
-          )
+          labels = scenario_labels
         ) +
         scale_linetype_manual(name = "Compensation",
                                         values = c("TotalWithTransfNeut" = "solid", 
                                                    "TotalWithTransfEpc" = "dashed"),
                                         labels = c("TotalWithTransfNeut" = "Neutral",
                                                    "TotalWithTransfEpc" = "EPC")) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
         labs(x = "Year", y = "Gini change from reference (points)", fill = "FE category") +
@@ -1171,15 +1186,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
     
   }
-
   
   if(any(plotlist == 'ineqWorldWithTransf_TheilLRela' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region == 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|TheilL'))
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region == 'World',
+             variable == "ineq|TheilL")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025") %>%
@@ -1211,24 +1223,19 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           values = myScenPalette,
           breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
                      "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
-          labels = c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def"   = "1.5°C HO",
-            "C_SSP2-loOS-def"   = "1.5°C LO"
-          )
+          labels = scenario_labels
         )+
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
-        labs(x = "Year", y = "Theil'L change from reference", fill = "FE category") +
+        labs(x = "Year", y = "Theil'L change from reference") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
         scale_linetype_manual(name = "Compensation",
                               values = c("TotalWithTransfNeut" = "solid", 
                                          "TotalWithTransfEpc" = "dashed"),
                               labels = c("TotalWithTransfNeut" = "Neutral",
                                          "TotalWithTransfEpc" = "EPC")) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         theme(axis.title.x = element_blank())
       ,
       
@@ -1243,11 +1250,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqWorldWithTransf_TheilTRela' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region == 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|TheilT'))
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region == 'World',
+             variable == "ineq|TheilT")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025") %>%
@@ -1288,15 +1293,15 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         )+
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
-        labs(x = "Year", y = "Theil'T change from reference", fill = "FE category") +
+        labs(x = "Year", y = "Theil'T change from reference") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
         scale_linetype_manual(name = "Compensation",
                               values = c("TotalWithTransfNeut" = "solid", 
                                          "TotalWithTransfEpc" = "dashed"),
                               labels = c("TotalWithTransfNeut" = "Neutral",
                                          "TotalWithTransfEpc" = "EPC")) +
-        scale_x_continuous(breaks = unique(plotdataWelf$period),
-                           labels = unique(plotdataWelf$period)) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
         theme(axis.title.x = element_blank())
       ,
       
@@ -1309,7 +1314,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
-#-----------------End 5.1 global inequality effect (Gini/Theil)----------------
+#-----------------End 4 global inequality effect (Gini/Theil)----------------
 
   
   
@@ -1318,16 +1323,13 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   
   
-#----------------------5.2 regional inequality effect----------------
-  
+#----------------------5 regional inequality effect----------------
   
   if(any(plotlist == 'ineqReg_Gini' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region != 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|Gini'))
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region != 'World',
+             variable == "ineq|Gini")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025")
@@ -1394,15 +1396,11 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
-  
-  
   if(any(plotlist == 'ineqReg_GiniRela' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region != 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|Gini'))
+    plotdf <-  dfIneqAll$ineqAll %>%
+      filter(region != 'World',
+             variable == "ineq|Gini")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025") %>%
@@ -1440,12 +1438,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           values = myScenPalette,
           breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
                      "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
-          labels = c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def"   = "1.5°C HO",
-            "C_SSP2-loOS-def"   = "1.5°C LO"
-          )
+          labels = scenario_labels
         ) +
         scale_linetype_manual(name = "Compensation",
                               values = c("TotalWithTransfNeut" = "solid", 
@@ -1465,11 +1458,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqReg_TheilLRela' | allExport  )){
     
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter( period <= 2100 ,
-              region != 'World',
-              category %in% c('TotalWithTransfNeut','Reference','TotalWithTransfEpc'),
-              variable %in% c('ineq|TheilL'))
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region != 'World',
+             variable == "ineq|TheilL")
     
     plotdf_ref <- plotdf %>%
       filter(scenario == "C_SSP2-NPi2025") %>%
@@ -1507,12 +1498,67 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           values = myScenPalette,
           breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
                      "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
-          labels = c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def"   = "1.5°C HO",
-            "C_SSP2-loOS-def"   = "1.5°C LO"
-          )
+          labels = scenario_labels
+        ) +
+        scale_linetype_manual(name = "Compensation",
+                              values = c("TotalWithTransfNeut" = "solid", 
+                                         "TotalWithTransfEpc" = "dashed"),
+                              labels = c("TotalWithTransfNeut" = "Neutral",
+                                         "TotalWithTransfEpc" = "EPC"))
+      ,
+      
+      width = 10,
+      height = 8
+      
+    )
+    
+    
+    
+  }
+  
+  if(any(plotlist == 'ineqReg_TheilTRela' | allExport  )){
+    
+    plotdf <- dfIneqAll$ineqAll %>%
+      filter(region != 'World',
+             variable == "ineq|TheilT")
+    
+    plotdf_ref <- plotdf %>%
+      filter(scenario == "C_SSP2-NPi2025") %>%
+      select(-scenario,-category) %>%
+      rename(ref = value)
+    
+    plotdf <- plotdf %>% filter(scenario != 'C_SSP2-NPi2025') %>%
+      left_join(plotdf_ref, by = c('region', 'period', 'variable' )) %>%
+      mutate(value = (value - ref) * 100,
+             variable ='ineq|deltaTheilL') %>%
+      select(-ref)  %>%
+      mutate(scenario = factor(scenario, levels = c(
+        "C_SSP2-PkBudg1000", 
+        "C_SSP2-PkBudg650",
+        "C_SSP2-loOS-def", 
+        "C_SSP2-hiOS-def" 
+      )))
+    
+    
+    # Automate over all scenarios
+    p[['ineqReg_TheilTRela']] <- list(
+      
+      plot = ggplot(plotdf, 
+                    aes(x = period, y = value, 
+                        linetype = category, color = scenario)) +
+        geom_line() + 
+        geom_hline(yintercept = 0)+
+        facet_wrap(~region, ncol = 3,
+                   scales = "free_y" ) +
+        labs(x = "Decile", y = "Theil'T Change from reference (points)", 
+             color = "Measure", linetype = "Scenario-State") +
+        #coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.99), na.rm = TRUE)) +
+        scale_color_manual(
+          name   = "Scenario",  # legend title
+          values = myScenPalette,
+          breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
+                     "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
+          labels = scenario_labels
         ) +
         scale_linetype_manual(name = "Compensation",
                               values = c("TotalWithTransfNeut" = "solid", 
@@ -1538,19 +1584,14 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   
   
-  #-------------5.3 regional inequality effect by Channel ----------------
+#-------------5.1 regional inequality effect by Channel ----------------
   
   if(any(plotlist == 'ineqRegBySec_Gini' | allExport  )){
     
-    
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter(
-        between(period, 2025, 2100),
-        region != "World",
-        !str_starts(coalesce(category, ""), "Total"),
-        category != 'Other commodities',
-        variable == "ineq|shapleyGini"
-      ) %>%
+    plotdf <- dfIneqChannel %>% 
+      filter(region != 'World',
+             category != 'Other commodities',
+             variable == 'ineq|shapleyGini') %>%
       mutate(
         category   = factor(category, levels = allSec),
         period_fac = factor(period),                 # keep labels
@@ -1563,23 +1604,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                             .default = 0),
         x = period_num + scen_off
       ) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000", 
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      ))) 
-   
+      mutate(scenario = factor(scenario, levels = scenario_levels)) 
     
     totals <- plotdf %>%
       group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
       summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000", 
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      ))) 
+      mutate(scenario = factor(scenario, levels = scenario_levels)) 
     
     p[[paste0('ineqRegBySec_Gini')]] <- list(
     
@@ -1588,7 +1618,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         # add the scenario markers
         geom_point(
           data = totals,
-          aes(x = x, y = total, shape = scenario),
+          aes(x = x, y = total * 100, shape = scenario),
           inherit.aes = FALSE,
           size = 1,
           colour = "black"
@@ -1601,12 +1631,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           "C_SSP2-hiOS-def" = 4,
           "C_SSP2-loOS-def" = 3
         ),
-        labels = c(
-          "C_SSP2-PkBudg1000" = "2°C",
-          "C_SSP2-PkBudg650"  = "1.5°C",
-          "C_SSP2-hiOS-def" = "1.5°C HO",
-          "C_SSP2-loOS-def" = "1.5°C LO"
-        )
+        labels = scenario_labels
         )+
         facet_wrap(~ region, ncol = 3) +
         scale_fill_manual(values = mySecPalette) +
@@ -1639,17 +1664,49 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
+  if(any(plotlist == 'ineqRegBySecSelected_Gini' | allExport  )){
+    
+    plotdf <- dfIneqChannel %>% 
+      filter(region %in% regSelect,
+             category != 'Other commodities',
+             variable == 'ineq|shapleyGini') %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels),
+             category = factor(category, levels = c(foodSec,eneSec)),
+             region = factor(region, levels = regSelect)) 
+    
+    
+    p[[paste0('ineqRegBySecSelected_Gini')]] <- list(
+      
+      plot = ggplot(plotdf, aes(x = period, y = value * 100, fill = category)) +
+        geom_col() +
+        # add the scenario markers
+        facet_grid(
+          region ~ scenario,
+          scales = "free_y",
+          labeller = labeller(scenario = as_labeller(scenario_labels))
+        )+
+        scale_fill_manual(values = mySecPalette) +
+        labs(x = "Year",
+             y = "Gini change from reference (points)",
+             fill = "Sectors") +
+        theme_minimal()
+      ,
+      
+      width = 10,
+      height = 8
+      
+    )
+    
+    
+    
+  }
+  
   if(any(plotlist == 'ineqRegBySec_TheilT' | allExport  )){
   
-  
-  plotdf <- plotdataIneq[['ineq']] %>%
-    filter(
-      between(period, 2025, 2100),
-      region != "World",
-      !str_starts(coalesce(category, ""), "Total"),
-      category != 'Other commodities',
-      variable == "ineq|shapleyTheilT"
-    ) %>%
+  plotdf <-  dfIneqChannel %>% 
+    filter(region != 'World',
+           category != 'Other commodities',
+           variable == 'ineq|shapleyTheilT') %>%
     mutate(
       category   = factor(category, levels = allSec),
       period_fac = factor(period),                 # keep labels
@@ -1662,23 +1719,13 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                           .default = 0),
       x = period_num + scen_off
     ) %>%
-    mutate(scenario = factor(scenario, levels = c(
-      "C_SSP2-PkBudg1000", 
-      "C_SSP2-PkBudg650",
-      "C_SSP2-loOS-def", 
-      "C_SSP2-hiOS-def" 
-    ))) 
+    mutate(scenario = factor(scenario, levels = scenario_levels)) 
   
   
   totals <- plotdf %>%
     group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
     summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
-    mutate(scenario = factor(scenario, levels = c(
-      "C_SSP2-PkBudg1000", 
-      "C_SSP2-PkBudg650",
-      "C_SSP2-loOS-def", 
-      "C_SSP2-hiOS-def" 
-    ))) 
+    mutate(scenario = factor(scenario, levels = scenario_levels)) 
   
   p[[paste0('ineqRegBySec_TheilT')]] <- list(
     
@@ -1700,12 +1747,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           "C_SSP2-hiOS-def" = 4,
           "C_SSP2-loOS-def" = 3
         ),
-        labels = c(
-          "C_SSP2-PkBudg1000" = "2°C",
-          "C_SSP2-PkBudg650"  = "1.5°C",
-          "C_SSP2-hiOS-def" = "1.5°C HO",
-          "C_SSP2-loOS-def" = "1.5°C LO"
-        )
+        labels = scenario_labels
       )+
       facet_wrap(~ region, ncol = 3) +
       scale_fill_manual(values = mySecPalette) +
@@ -1731,7 +1773,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
     width = 10,
     height = 8
-    
   )
   
   
@@ -1740,15 +1781,10 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqRegBySec_TheilL' | allExport  )){
     
-    
-    plotdf <- plotdataIneq[['ineq']] %>%
-      filter(
-        between(period, 2025, 2100),
-        region != "World",
-        !str_starts(coalesce(category, ""), "Total"),
-        category != 'Other commodities',
-        variable == "ineq|shapleyTheilL"
-      ) %>%
+    plotdf <-  dfIneqChannel %>% 
+      filter(region != 'World',
+             category != 'Other commodities',
+             variable == 'ineq|shapleyTheilL') %>%
       mutate(
         category   = factor(category, levels = allSec),
         period_fac = factor(period),                 # keep labels
@@ -1761,23 +1797,13 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                             .default = 0),
         x = period_num + scen_off
       ) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000", 
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      ))) 
+      mutate(scenario = factor(scenario, levels = scenario_levels)) 
     
     
     totals <- plotdf %>%
       group_by(region, period_fac, period_num, scen_off, scenario, x) %>%
-      summarise(total = sum(value, na.rm = TRUE)+0.005, .groups = "drop") %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000", 
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      ))) 
+      summarise(total = sum(value, na.rm = TRUE) + 0.005, .groups = "drop") %>%
+      mutate(scenario = factor(scenario, levels = scenario_levels)) 
     
     p[[paste0('ineqRegBySec_TheilL')]] <- list(
       
@@ -1799,12 +1825,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
             "C_SSP2-hiOS-def" = 4,
             "C_SSP2-loOS-def" = 3
           ),
-          labels = c(
-            "C_SSP2-PkBudg1000" = "2°C",
-            "C_SSP2-PkBudg650"  = "1.5°C",
-            "C_SSP2-hiOS-def" = "1.5°C HO",
-            "C_SSP2-loOS-def" = "1.5°C LO"
-          )
+          labels = scenario_labels
         )+
         facet_wrap(~ region, ncol = 3) +
         scale_fill_manual(values = mySecPalette) +
@@ -1837,22 +1858,20 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
-  
-  
-  
-  #-------------End 5.3 regional inequality effect by Channel (Theil)-----------
+#-------------End 5.3 regional inequality effect by Channel-----------
   
   
   
   
   
   
-  #-------------5.4 regional inequality contribution to Global----------------
+#-------------5.2 regional inequality contribution to Global----------------
   
   #inequality Contribution of between and within country inequality
   if(any(plotlist == 'ineqGlobalBetweenWithinTheilT_Neut' | allExport  )){
     
-    plotdf <- plotdataIneq[['theilTDecompNeut']]%>%
+    plotdf <- dfIneqAll$theilTDecomp %>%
+      filter(scheme == 'Neut') %>%
       mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,
              `Tt.b|delta` = Tt.b - `Tt.b|base`,
              `Tt.iw|delta` = Tt.iw - `Tt.iw|base`) %>%
@@ -1869,13 +1888,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tt.b|delta" = "Between",
                                 "Tt.iw|delta" = "Within",
                                 "Tt.i|delta" = "Total")) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000", 
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
-    
+      mutate(scenario = factor(scenario, levels = scenario_levels ))
     
     p[['ineqGlobalBetweenWithinTheilT_Neut']] <- list(
       
@@ -1889,17 +1902,13 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         ) +
         facet_wrap(~scenario,
                    labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-hiOS-def" = "1.5°C HO",
-                       "C_SSP2-loOS-def" = "1.5°C LO")
-                   )) +
+                     scenario_labels
+                     )) +
         labs(
           x = "Year",
-          y = "Change in Inequality (Theil)",
+          y = "Change in Inequality (Theil'T)",
           title = "Theil Inequality Decomposition over Time by Scenario",
-          fill = "Component",
-          color = "Theil"
+          fill = "Component"
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
@@ -1918,29 +1927,25 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqGlobalBetweenWithinTheilL_Neut' | allExport  )){
     
-    plotdf <- plotdataIneq[['theilLDecompNeut']]%>%
+    plotdf <- dfIneqAll$theilLDecomp %>%
+      filter(scheme == 'Neut') %>%
       mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
-             `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
+             `Tl.b|delta` = Tl.b - `Tl.b|base`,
              `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
       group_by(scenario,period) %>%
       summarise( `Tl.i|delta` = sum(`Tl.i|delta`),
-                 `Tl.ib|delta` = sum(`Tl.ib|delta`),
+                 `Tl.b|delta` = sum(`Tl.b|delta`),
                  `Tl.iw|delta` = sum(`Tl.iw|delta`),
                  .groups = "drop") %>%
-      pivot_longer(cols = c(`Tl.ib|delta`, `Tl.iw|delta`, `Tl.i|delta`),
+      pivot_longer(cols = c(`Tl.b|delta`, `Tl.iw|delta`, `Tl.i|delta`),
                    names_to = "component",
                    values_to = "value") %>%
       filter(period <= 2100) %>%
       mutate(component = recode(component,
-                                "Tl.ib|delta" = "Between",
+                                "Tl.b|delta" = "Between",
                                 "Tl.iw|delta" = "Within",
                                 "Tl.i|delta" = "Total")) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
+      mutate(scenario = factor(scenario, levels = scenario_levels ))
     
     p[['ineqGlobalBetweenWithinTheilL_Neut']] <- list(
       
@@ -1952,28 +1957,15 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           position = "stack",
           alpha = 0.6
         ) +
-        # Line plot for Total
-        # geom_line(
-        #   data = filter(plotdf, component == "Total"),
-        #   color = "black",
-        #   linetype = 'dashed',
-        #   aes(color = component),
-        #   size = 0.8
-        # ) +
-        facet_wrap(~scenario, ncol = 2,
+        facet_wrap(~scenario,
                    labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-hiOS-def" = "1.5°C HO",
-                       "C_SSP2-loOS-def" = "1.5°C LO")
-                   )
-        ) +
+                     scenario_labels
+                   )) +
         labs(
           x = "Year",
-          y = "Theil'L change from reference",
-          #title = "Theil Inequality Decomposition over Time by Scenario",
-          fill = "Component",
-          color = "Theil"
+          y = "Change in Inequality (Theil'L)",
+          title = "Theil Inequality Decomposition over Time by Scenario",
+          fill = "Component"
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
@@ -1992,7 +1984,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqGlobalBetweenWithinTheilT_Epc' | allExport  )){
     
-    plotdf <- plotdataIneq[['theilTDecompEpc']]%>%
+    plotdf <- dfIneqAll$theilTDecomp %>%
+      filter(scheme == 'EPC') %>%
       mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,
              `Tt.b|delta` = Tt.b - `Tt.b|base`,
              `Tt.iw|delta` = Tt.iw - `Tt.iw|base`) %>%
@@ -2009,15 +2002,9 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                                 "Tt.b|delta" = "Between",
                                 "Tt.iw|delta" = "Within",
                                 "Tt.i|delta" = "Total")) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
+      mutate(scenario = factor(scenario, levels = scenario_levels ))
     
-    
-    p[['ineqGlobalBetweenWithinTheilT_Epc']] <- list(
+    p[['ineqGlobalBetweenWithinTheilT_Neut']] <- list(
       
       plot = ggplot(plotdf, aes(x = period, y = value, group = component)) +
         # Area plots for Within and Between
@@ -2029,24 +2016,20 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         ) +
         facet_wrap(~scenario,
                    labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-hiOS-def" = "1.5°C HO",
-                       "C_SSP2-loOS-def" = "1.5°C LO")
-                     )) +
+                     scenario_labels
+                   )) +
         labs(
           x = "Year",
-          y = "Change in Inequality (Theil)",
+          y = "Change in Inequality (Theil'T)",
           title = "Theil Inequality Decomposition over Time by Scenario",
-          fill = "Component",
-          color = "Theil"
+          fill = "Component"
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
         paletteer::scale_fill_paletteer_d(name = "Contribution", "NatParksPalettes::Yellowstone",
                                           labels = c('Between' = 'Between-country',
                                                      'Within' = 'Within-country')) 
-        
+      
       ,
       
       width = 8,
@@ -2058,31 +2041,27 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqGlobalBetweenWithinTheilL_Epc' | allExport  )){
     
-    plotdf <- plotdataIneq[['theilLDecompEpc']]%>%
+    plotdf <- dfIneqAll$theilLDecomp %>%
+      filter(scheme == 'EPC') %>%
       mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
-             `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
+             `Tl.b|delta` = Tl.b - `Tl.b|base`,
              `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
       group_by(scenario,period) %>%
       summarise( `Tl.i|delta` = sum(`Tl.i|delta`),
-                 `Tl.ib|delta` = sum(`Tl.ib|delta`),
+                 `Tl.b|delta` = sum(`Tl.b|delta`),
                  `Tl.iw|delta` = sum(`Tl.iw|delta`),
                  .groups = "drop") %>%
-      pivot_longer(cols = c(`Tl.ib|delta`, `Tl.iw|delta`, `Tl.i|delta`),
+      pivot_longer(cols = c(`Tl.b|delta`, `Tl.iw|delta`, `Tl.i|delta`),
                    names_to = "component",
                    values_to = "value") %>%
       filter(period <= 2100) %>%
       mutate(component = recode(component,
-                                "Tl.ib|delta" = "Between",
+                                "Tl.b|delta" = "Between",
                                 "Tl.iw|delta" = "Within",
                                 "Tl.i|delta" = "Total")) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
+      mutate(scenario = factor(scenario, levels = scenario_levels ))
     
-    p[['ineqGlobalBetweenWithinTheilL_Epc']] <- list(
+    p[['ineqGlobalBetweenWithinTheilL_Neut']] <- list(
       
       plot = ggplot(plotdf, aes(x = period, y = value, group = component)) +
         # Area plots for Within and Between
@@ -2092,28 +2071,15 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           position = "stack",
           alpha = 0.6
         ) +
-        # Line plot for Total
-        # geom_line(
-        #   data = filter(plotdf, component == "Total"),
-        #   color = "black",
-        #   linetype = 'dashed',
-        #   aes(color = component),
-        #   size = 0.8
-        # ) +
-        facet_wrap(~scenario, ncol = 2,
+        facet_wrap(~scenario,
                    labeller = as_labeller(
-                     c("C_SSP2-PkBudg1000" = "2°C",
-                       "C_SSP2-PkBudg650"  = "1.5°C",
-                       "C_SSP2-hiOS-def" = "1.5°C HO",
-                       "C_SSP2-loOS-def" = "1.5°C LO")
-                   )
-        ) +
+                     scenario_labels
+                   )) +
         labs(
           x = "Year",
-          y = "Theil'L change from reference",
-          #title = "Theil Inequality Decomposition over Time by Scenario",
-          fill = "Component",
-          color = "Theil"
+          y = "Change in Inequality (Theil'L)",
+          title = "Theil Inequality Decomposition over Time by Scenario",
+          fill = "Component"
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
@@ -2131,11 +2097,11 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   }
   
   
-  
     #Regional contribution to within region theil index
   if(any(plotlist == 'ineqGlobalWithinRegTheilT_Epc' | allExport  )){
       
-      plotdf <- plotdataIneq[['theilTDecompEpc']]%>%
+      plotdf <- dfIneqAll$theilTDecomp %>%
+        filter(scheme == 'EPC') %>%
         mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,
                `Tt.b|delta` = Tt.b - `Tt.b|base`,
                `Tt.iw|delta` = Tt.iw - `Tt.iw|base`) %>%
@@ -2145,15 +2111,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         rename(within = "Tt.iw|delta") %>%
         filter(period <= 2100)
 
-      # plotdf <- plotdataIneq[['theilDecomp']]%>%
-      #   mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
-      #          `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
-      #          `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
-      #   group_by(scenario,period,region) %>%
-      #   summarise( `Tl.iw|delta` = sum(`Tl.iw|delta`),
-      #              .groups = "drop") %>%
-      #   rename(within = "Tl.iw|delta") %>%
-      #   filter(period <= 2100) 
       
       plotdf <- plotdf %>% 
         group_by(scenario, period) %>%
@@ -2161,12 +2118,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                   .groups = "drop") %>%
         mutate(region = 'total') %>%
         bind_rows(plotdf) %>%
-        mutate(scenario = factor(scenario, levels = c(
-          "C_SSP2-PkBudg1000",
-          "C_SSP2-PkBudg650",
-          "C_SSP2-loOS-def", 
-          "C_SSP2-hiOS-def" 
-        )))
+        mutate(scenario = factor(scenario, levels = scenario_levels))
 
       
       p[['ineqGlobalWithinRegTheilT_Epc']] <- list(
@@ -2191,8 +2143,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
             x = "Year",
             y = "Change in Inequality (Theil)",
             title = "Theil Inequality Decomposition over Time by Scenario",
-            fill = "Component",
-            color = "Theil"
+            fill = "Component"
           ) +
           scale_x_continuous(breaks = unique(plotdf$period),
                              labels = unique(plotdf$period)) +
@@ -2205,13 +2156,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         height = 5
         
       )
+      
+      
     }
       
   if(any(plotlist == 'ineqGlobalWithinRegTheilL_Epc' | allExport  )){
      
-    plotdf <- plotdataIneq[['theilLDecompEpc']]%>%
+    plotdf <-  dfIneqAll$theilLDecomp %>%
+      filter(scheme == 'EPC') %>%
         mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
-               `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
+               `Tl.b|delta` = Tl.b - `Tl.b|base`,
                `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
         group_by(scenario,period,region) %>%
         summarise( `Tl.iw|delta` = sum(`Tl.iw|delta`),
@@ -2225,12 +2179,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                   .groups = "drop") %>%
         mutate(region = 'total') %>%
         bind_rows(plotdf) %>%
-        mutate(scenario = factor(scenario, levels = c(
-          "C_SSP2-PkBudg1000",
-          "C_SSP2-PkBudg650",
-          "C_SSP2-loOS-def", 
-          "C_SSP2-hiOS-def" 
-        )))
+        mutate(scenario = factor(scenario, levels = scenario_levels))
       
       p[['ineqGlobalWithinRegTheilL_Epc']] <- list(
         
@@ -2253,8 +2202,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
             x = "Year",
             y = "Theil'L change from reference",
             #title = "Theil Inequality Decomposition over Time by Scenario",
-            fill = "Component",
-            color = "Theil"
+            fill = "Component"
           ) +
           scale_x_continuous(breaks = unique(plotdf$period),
                              labels = unique(plotdf$period)) +
@@ -2286,73 +2234,72 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
   
   if(any(plotlist == 'ineqGlobalWithinRegTheilT_Neut' | allExport  )){
       
-      plotdf <- plotdataIneq[['theilTDecompNeut']]%>%
-        mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,
-               `Tt.b|delta` = Tt.b - `Tt.b|base`,
-               `Tt.iw|delta` = Tt.iw - `Tt.iw|base`) %>%
-        group_by(scenario,period,region) %>%
-        summarise( `Tt.iw|delta` = sum(`Tt.iw|delta`),
-                   .groups = "drop") %>%
-        rename(within = "Tt.iw|delta") %>%
-        filter(period <= 2100)
+    plotdf <- dfIneqAll$theilTDecomp %>%
+      filter(scheme == 'Neut') %>%
+      mutate(`Tt.i|delta` = Tt.i - `Tt.i|base`,
+             `Tt.b|delta` = Tt.b - `Tt.b|base`,
+             `Tt.iw|delta` = Tt.iw - `Tt.iw|base`) %>%
+      group_by(scenario,period,region) %>%
+      summarise( `Tt.iw|delta` = sum(`Tt.iw|delta`),
+                 .groups = "drop") %>%
+      rename(within = "Tt.iw|delta") %>%
+      filter(period <= 2100)
+    
+    
+    plotdf <- plotdf %>% 
+      group_by(scenario, period) %>%
+      summarise(within = sum(within),
+                .groups = "drop") %>%
+      mutate(region = 'total') %>%
+      bind_rows(plotdf) %>%
+      mutate(scenario = factor(scenario, levels =scenario_levels))
+    
+    
+    p[['ineqGlobalWithinRegTheilT_Neut']] <- list(
       
-      plotdf <- plotdf %>% 
-        group_by(scenario, period) %>%
-        summarise(within = sum(within),
-                  .groups = "drop") %>%
-        mutate(region = 'total') %>%
-        bind_rows(plotdf) %>%
-        mutate(scenario = factor(scenario, levels = c(
-          "C_SSP2-PkBudg1000",
-          "C_SSP2-PkBudg650",
-          "C_SSP2-loOS-def", 
-          "C_SSP2-hiOS-def" 
-        )))
-
+      plot = ggplot(plotdf, aes(x = period, y = within, group = region)) +
+        # Area plots for Within and Between
+        geom_area(
+          data = filter(plotdf, region != 'total'),
+          aes(fill = region),
+          position = "stack",
+          alpha = 0.5
+        ) +
+        facet_wrap(~scenario, ncol = 2,
+                   labeller = as_labeller(
+                     c("C_SSP2-PkBudg1000" = "2°C",
+                       "C_SSP2-PkBudg650"  = "1.5°C",
+                       "C_SSP2-hiOS-def" = "1.5°C HO",
+                       "C_SSP2-loOS-def" = "1.5°C LO")
+                   )
+        ) +
+        labs(
+          x = "Year",
+          y = "Change in Inequality (Theil)",
+          title = "Theil Inequality Decomposition over Time by Scenario",
+          fill = "Component"
+        ) +
+        scale_x_continuous(breaks = unique(plotdf$period),
+                           labels = unique(plotdf$period)) +
+        scale_fill_paletteer_d("PrettyCols::Summer")+
+        scale_color_manual(values = c("Total" = "black")) 
       
-      p[['ineqGlobalWithinRegTheilT_Neut']] <- list(
-        
-        plot = ggplot(plotdf, aes(x = period, y = within, group = region)) +
-          # Area plots for Within and Between
-          geom_area(
-            data = filter(plotdf, region != 'total'),
-            aes(fill = region),
-            position = "stack",
-            alpha = 0.5
-          ) +
-          facet_wrap(~scenario, ncol = 2,
-                     labeller = as_labeller(
-                       c("C_SSP2-PkBudg1000" = "2°C",
-                         "C_SSP2-PkBudg650"  = "1.5°C",
-                         "C_SSP2-hiOS-def" = "1.5°C HO",
-                         "C_SSP2-loOS-def" = "1.5°C LO")
-                     )
-          ) +
-          labs(
-            x = "Year",
-            y = "Change in Inequality (Theil)",
-            title = "Theil Inequality Decomposition over Time by Scenario",
-            fill = "Component",
-            color = "Theil"
-          ) +
-          scale_x_continuous(breaks = unique(plotdf$period),
-                             labels = unique(plotdf$period)) +
-          scale_fill_paletteer_d("PrettyCols::Summer")+
-          scale_color_manual(values = c("Total" = "black")) 
-        
-        ,
-        
-        width = 8,
-        height = 5
-        
-      )
+      ,
+      
+      width = 8,
+      height = 5
+      
+    )
+    
+    
     }
 
   if(any(plotlist == 'ineqGlobalWithinRegTheilL_Neut' | allExport  )){
     
-    plotdf <- plotdataIneq[['theilLDecompNeut']]%>%
+    plotdf <-  dfIneqAll$theilLDecomp %>%
+      filter(scheme == 'Neut') %>%
       mutate(`Tl.i|delta` = Tl.i - `Tl.i|base`,
-             `Tl.ib|delta` = Tl.ib - `Tl.ib|base`,
+             `Tl.b|delta` = Tl.b - `Tl.b|base`,
              `Tl.iw|delta` = Tl.iw - `Tl.iw|base`) %>%
       group_by(scenario,period,region) %>%
       summarise( `Tl.iw|delta` = sum(`Tl.iw|delta`),
@@ -2366,12 +2313,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                 .groups = "drop") %>%
       mutate(region = 'total') %>%
       bind_rows(plotdf) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def", 
-        "C_SSP2-hiOS-def" 
-      )))
+      mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[['ineqGlobalWithinRegTheilL_Neut']] <- list(
       
@@ -2394,8 +2336,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           x = "Year",
           y = "Theil'L change from reference",
           #title = "Theil Inequality Decomposition over Time by Scenario",
-          fill = "Component",
-          color = "Theil"
+          fill = "Component"
         ) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
@@ -2422,241 +2363,125 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
     
     
-    
   }
   
-  #-------------End 5.4 regional inequality effect by Channel (Theil)-----------
+#-------------End 5.2 regional inequality effect by Channel (Theil)-----------
   
   
   
-  #---------------------------6 Global tax revenue ------------------
-  if(any(plotlist == 'taxRevenueWorld' | allExport  )){
+#---------------------------6 Global tax revenue -------------------------------
+  
+  if(any(plotlist == 'taxRevenueOptionWorld' | allExport  )){
     
-    revenue_smoothed <- compute_transfer(data3, data2, climaFund = 0,
-                                         fund_return_scale = 1,
-                                         payg = 1,, revenueRep = 1) %>%
-      group_by(scenario,period) %>%
-      summarise(value = sum(revenue)) %>%
-      filter(period <= 2100)
+    revenue1 <- compute_transfer(dfData, dfDecileConsShare, taxBase = 'GHG',
+                                 climaFund = 0,
+                                 fund_return_scale = 1,
+                                 payg = 1, revenueRep = 1)
     
-    plotdf <- bind_rows(
-      # World total from MAgPIE (constructed)
-      data3 %>%
-        filter(str_starts(variable, "Taxes"),
-               model == "MAgPIE") %>%
-        mutate(variable = str_remove(variable, "^Taxes\\|?")) %>%
-        group_by(scenario, variable, period, unit, baseline) %>%  # no need to group by model after filtering
-        summarise(value = sum(value, na.rm = TRUE), .groups = "drop") %>%
-        mutate(region = "World", model = "MAgPIE"),
-      # World rows already present in data (any model)
-      data3 %>%
-        filter(str_starts(variable, "Taxes"),
-               region == "World") %>%
-        mutate(variable = str_remove(variable, "^Taxes\\|?"))
+    revenue2 <- compute_transfer(dfData, dfDecileConsShare, taxBase = 'GHGwoLUC',
+                                 climaFund = 0,
+                                 fund_return_scale = 1,
+                                 payg = 1, revenueRep = 1)
+    
+    revenue3 <- compute_transfer(dfData, dfDecileConsShare, taxBase = 'CO2woLUC',
+                                 climaFund = 0,
+                                 fund_return_scale = 1,
+                                 payg = 1, revenueRep = 1)
+    
+    rev_df <- bind_rows(
+      revenue1 %>% mutate(taxBase = "GHG"),
+      revenue2 %>% mutate(taxBase = "GHG wo LUC"),
+      revenue3 %>% mutate(taxBase = "CO2 wo LUC")
     ) %>%
-      # keep only the two layers we want to stack
-      filter(variable %in% c("GHG|REMIND", "GHG|MAGPIE")) %>%
-      # control stacking order: bottom -> top
-      mutate(
-        variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
-        # make sure x is ordered for area stacking
-        period = as.integer(period)
-      ) %>%
-      filter(period <= 2100) %>%
-      mutate(scenario = factor(scenario, levels = c(
-        "C_SSP2-PkBudg1000",
-        "C_SSP2-PkBudg650",
-        "C_SSP2-loOS-def",
-        "C_SSP2-hiOS-def"
-      )))
-    
-
-    sumdf <- plotdf %>%
-      group_by(scenario, period) %>%
-      summarise(total = sum(value, na.rm = TRUE), .groups = "drop") 
-    
-      p[[paste0("taxRevenueWorld")]] <- list(
-        plot =
-          ggplot(plotdf, aes(x = period, y = value, fill = variable)) +
-          geom_area(alpha = 0.7, color = NA, position = "stack") +
-          geom_line(
-            data = sumdf,
-            aes(x = period, y = total, color = "Total"),
-            inherit.aes = FALSE,
-            linewidth = 0.8,
-            linetype = "solid"
-          ) +
-          geom_line(
-            data = revenue_smoothed,
-            aes(x= period, y =value),
-            color = "#446482",
-            inherit.aes = FALSE,
-            linewidth = 0.8,
-            linetype = "dashed"
-          )+
-          facet_wrap(
-            ~ scenario, ncol = 2,
-            labeller = as_labeller(c(
-              "C_SSP2-PkBudg1000" = "2°C",
-              "C_SSP2-PkBudg650"  = "1.5°C",
-              "C_SSP2-hiOS-def"   = "1.5°C HO",
-              "C_SSP2-loOS-def"   = "1.5°C LO"
-            ))
-          ) +
-          scale_fill_paletteer_d(
-            "dutchmasters::view_of_Delft",
-            name   = "Source",
-            labels = c("Energy system", "Land sector")
-          ) +
-          scale_color_manual(
-            name   = "",
-            values = c("Total" = "#446482"),    
-            labels = c("Total" = "Total net revenue")
-          ) +
-          guides(
-            fill  = guide_legend(order = 1),
-            color = guide_legend(order = 2, override.aes = list(linetype = "solid", linewidth = 1.2))
-          ) +
-          scale_x_continuous(breaks = unique(plotdataWelf$period),
-                             labels = unique(plotdataWelf$period)) +
-          labs(x = "Year", y = "Carbon revenue (billion$)") 
-          # theme_minimal() +
-          # theme(
-          #   legend.position = "bottom",
-          #   strip.text = element_blank(),
-          #   axis.text.x = element_text(angle = 45, hjust = 1),
-          #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-          #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-          #   panel.grid.minor.x = element_blank(),
-          #   panel.grid.minor.y = element_blank(),
-          #   panel.background   = element_rect(fill = "white", color = NA)
-          # )
-        ,
-        
-        width  = 8,
-        height = 3
+      group_by(period, scenario, taxBase) %>%
+      summarise(
+        revenue = sum(revenue, na.rm = TRUE),
+        .groups = "drop"
       )
+    
+    gdp_scen <- dfData %>%
+      filter(
+        region == "World",
+        variable == "GDP|MER",
+        scenario %in% unique(rev_df$scenario)
+      ) %>%
+      transmute(
+        period   = as.numeric(period),
+        scenario = scenario,
+        gdpMER   = value
+      ) 
+    
+    plotdf <- rev_df %>%
+      mutate(period = as.numeric(period)) %>%
+      left_join(gdp_scen, by = c("period", "scenario")) %>%
+      mutate(
+        revShareGDP = 100 * revenue / gdpMER
+      ) %>%
+      filter(!is.na(gdpMER)) %>%
+      mutate(
+        taxBase = factor(
+          taxBase,
+          levels = c("GHG", "GHG wo LUC", "CO2 wo LUC")
+        )
+      )
+    
+    p[[paste0("taxRevenueOptionWorld")]] <- list(
+      plot = ggplot( plotdf, aes(
+                       x = period,
+                       y = revShareGDP,
+                       color = scenario,
+                       linetype = taxBase,
+                       group = interaction(scenario, taxBase)
+                       )) +
+        geom_hline(yintercept = 0, linewidth = 0.4) +
+        geom_line(linewidth = 1) +
+        geom_point(shape = 17, size = 2) +
+        scale_color_manual(
+          values = myScenPalette,
+          labels = stringr::str_wrap(scenario_labels, 25)
+        ) +
+        scale_linetype_manual(
+          values = c("solid", "dashed", "dotted"),
+          labels = stringr::str_wrap(levels(plotdf$taxBase), 25)
+        ) +
+        labs(
+          x = "Year",
+          y = "Revenue (% of World GDP|MER)",
+          color = "Scenario",
+          linetype = "Tax"
+        ) +
+        scale_x_continuous(breaks = sort(unique(plotdf$period))) +
+        theme_bw() +
+        theme(
+          legend.position = "bottom",
+          legend.box = "vertical",
+          legend.text = element_text(lineheight = 0.8, size = 9),
+          legend.key.height = unit(0.35, "lines"),
+          legend.spacing.y = unit(0.05, "cm"),
+          panel.grid.minor = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)
+        )
+        
+      ,
       
-      
+      width  = 6,
+      height = 4
+    )
+    
+    
     
     
     
   }
-  
 
-  
-  # if(any(plotlist == 'taxRevenueLAM' | allExport  )){
-  #   
-  #   revenue_smoothed <- compute_transfer(data3, data2, revenue = 1) %>%
-  #     filter(period <=2100) %>%
-  #     filter(region == 'LAM') %>%
-  #     rename(value = 'revenue_smoothed') %>%
-  #     filter(scenario =='C_SSP2-hiOS-def')
-  #   
-  #   plotdf <- bind_rows(
-  #     # World rows already present in data (any model)
-  #     data3 %>%
-  #       filter(str_starts(variable, "Taxes"),
-  #              region == "LAM") %>%
-  #       mutate(variable = str_remove(variable, "^Taxes\\|?"))
-  #   ) %>%
-  #     # keep only the two layers we want to stack
-  #     filter(variable %in% c("GHG|REMIND", "GHG|MAGPIE")) %>%
-  #     # control stacking order: bottom -> top
-  #     mutate(
-  #       variable = factor(variable, levels = c("GHG|REMIND", "GHG|MAGPIE")),
-  #       # make sure x is ordered for area stacking
-  #       period = as.integer(period)
-  #     ) %>%
-  #     filter(period <= 2100) %>%
-  #     mutate(scenario = factor(scenario, levels = c(
-  #       "C_SSP2-loOS-def",
-  #       "C_SSP2-hiOS-def"
-  #     ))) %>%
-  #     filter(scenario =='C_SSP2-hiOS-def')
-  #   
-  #   
-  #   sumdf <- plotdf %>%
-  #     group_by(scenario, period) %>%
-  #     summarise(total = sum(value, na.rm = TRUE), .groups = "drop") 
-  #   
-  #   p[[paste0("taxRevenueLAM")]] <- list(
-  #     plot =
-  #       ggplot(plotdf, aes(x = period, y = value, fill = variable)) +
-  #       geom_area(alpha = 0.7, color = NA, position = "stack") +
-  #       geom_line(
-  #         data = sumdf,
-  #         aes(x = period, y = total, color = "Total"),
-  #         inherit.aes = FALSE,
-  #         linewidth = 0.8,
-  #         linetype = "solid"
-  #       ) +
-  #       geom_line(
-  #         data = revenue_smoothed,
-  #         aes(x= period, y =value),
-  #         color = "#446482",
-  #         inherit.aes = FALSE,
-  #         linewidth = 0.8,
-  #         linetype = "dashed"
-  #       )+
-  #       facet_wrap(
-  #         ~ scenario, ncol = 2,
-  #         labeller = as_labeller(c(
-  #           "C_SSP2-PkBudg1000" = "2°C",
-  #           "C_SSP2-PkBudg650"  = "1.5°C",
-  #           "C_SSP2-hiOS-def"   = "1.5°C HO",
-  #           "C_SSP2-loOS-def"   = "1.5°C LO"
-  #         ))
-  #       ) +
-  #       scale_fill_paletteer_d(
-  #         "dutchmasters::view_of_Delft",
-  #         name   = "Source",
-  #         labels = c("Energy system", "Land sector")
-  #       ) +
-  #       scale_color_manual(
-  #         name   = "",
-  #         values = c("Total" = "#446482"),    
-  #         labels = c("Total" = "Total net revenue")
-  #       ) +
-  #       guides(
-  #         fill  = guide_legend(order = 1),
-  #         color = guide_legend(order = 2, override.aes = list(linetype = "solid", linewidth = 1.2))
-  #       ) +
-  #       scale_x_continuous(breaks = unique(plotdataWelf$period),
-  #                          labels = unique(plotdataWelf$period)) +
-  #       labs(x = "Year", y = "Carbon revenue (billion$)") 
-  #     # theme_minimal() +
-  #     # theme(
-  #     #   legend.position = "bottom",
-  #     #   strip.text = element_blank(),
-  #     #   axis.text.x = element_text(angle = 45, hjust = 1),
-  #     #   panel.grid.major.y = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-  #     #   panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
-  #     #   panel.grid.minor.x = element_blank(),
-  #     #   panel.grid.minor.y = element_blank(),
-  #     #   panel.background   = element_rect(fill = "white", color = NA)
-  #     # )
-  #     ,
-  #     
-  #     width  = 4,
-  #     height = 3
-  #   )
-  #   
-  #   
-  #   
-  #   
-  #   
-  # } 
-  # 
-  #-------------End 6 Global tax revenue-------------
+#-------------------End 6 Global tax revenue------------------------------------
     
   
-  #--------------------------7.categorization of sector driver-----------------
+#--------------------------7.categorization of sector driver-----------------
   
   if(any(plotlist == 'shockVsExposurebySec'| allExport)) {
     
-    
-    plotdf <- data3 %>% 
+    plotdf <- dfData %>% 
       filter(
         str_starts(variable, "relaPrice") |
           str_starts(variable, "share"),
@@ -2690,9 +2515,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       mutate(relaPrice = (relaPrice -1) * 100,
              share = share *100,
              category = factor(category, levels = allSec),
-             period = factor(period, levels = c(2040,2070,2100))) %>%
+             period = factor(period, levels = c(2035,2060,2100))) %>%
       arrange(region, category, period)
-    
     
     shareMean <- mean(plotdf$share)
     priceMean <- mean(plotdf$relaPrice)
@@ -2757,7 +2581,8 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           theme(
             panel.grid   = element_blank(),
             panel.border = element_rect(color = "black", fill = NA)
-          ),
+          )
+        ,
         
         width  = 10,
         height = 8
@@ -2765,26 +2590,99 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       )
     }
     
+  }
+  
+  
+  if(any(plotlist == 'categoryColiVsIneq' | allExport  )){
+    
+    mySecPalette_dark <- darken(mySecPalette, amount = 0.4)
+    
+    coli <- aggregate_decileWelfChange(
+      data1 = dfDecileWelfChange,
+      data2 = dfDecileConsShare,
+      secLevel = "fullSec",
+      scope = "region"
+    ) %>%
+      filter(category != "Other commodities",
+             region %in% regSelect) %>%
+      mutate(category = factor(category, levels = c(foodSec, eneSec)))
+    
+    ineq <- dfIneqChannel %>%
+      filter(region %in% regSelect,
+             category != "Other commodities",
+             variable == "ineq|shapleyGini") %>%
+      mutate(
+        scenario = factor(scenario, levels = scenario_levels),
+        category = factor(category, levels = c(foodSec, eneSec)),
+        region   = factor(region, levels = regSelect)
+      ) %>%
+      transmute(scenario, region, period, category, ineq = value * 100)  # <-- scale up
+    
+    d <- inner_join(coli, ineq, by = c("scenario","region","period","category"))
+    
+    
+    d_sum <- d %>%
+      group_by(category) %>%
+      summarise(
+        x_med = median(-welfChange, na.rm = TRUE),
+        y_med = median(ineq, na.rm = TRUE),
+        x_lo  = quantile(-welfChange, 0.25, na.rm = TRUE),
+        x_hi  = quantile(-welfChange, 0.75, na.rm = TRUE),
+        y_lo  = quantile(ineq, 0.25, na.rm = TRUE),
+        y_hi  = quantile(ineq, 0.75, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    
+    p[[paste0('categoryColiVsIneq')]] <- list(
+      
+      plot = ggplot(d_sum, aes(x = x_med, y = y_med, colour = category)) +
+        geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.3) +
+        geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+        geom_errorbar(aes(ymin = y_lo, ymax = y_hi), width = 0) +
+        geom_errorbarh(aes(xmin = x_lo, xmax = x_hi), width = 0) +   # <- changed
+        geom_point(size = 3) +
+        scale_colour_manual(values = mySecPalette) +
+        ggnewscale::new_scale_colour() +
+        ggrepel::geom_text_repel(
+          aes(label = category, colour = category),
+          size = 3,
+          max.overlaps = Inf,          # <- changed
+          show.legend = FALSE
+        ) +
+        scale_colour_manual(values = mySecPalette_dark) +
+        
+        theme_minimal() +
+        theme(legend.position = "none") +
+        labs(
+          x = "Contribution to COLI change (log points)",
+          y = "Contribution to ΔGini (pp)",
+          colour = "Sector"
+        )
+      ,
+      
+      width = 4,
+      height = 4
+      
+    )
+    
     
     
   }
   
   
+#----------------------End 7. categorization of sector drivers---------------
   
   
   
+#--------------------------8. burden on deciles -----------------
   
-
-  #----------------------End 7. categorization of sector drivers---------------
-  
-  
-  
-  #--------------------------8. burden on deciles -----------------
-  
-  if(any(plotlist == 'secBurdenByGlobalDecile' | allExport  )){
+  if(any(plotlist == 'decileColiGlobalbyDecile' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-                                         secLevel = c("fullSec"), scope = 'globalDecile') %>%
+    plotdf <- aggregate_decileWelfChange(data1 = dfDecileWelfChange, 
+                                         data2 = dfDecileConsShare, 
+                                         secLevel = c("fullSec"), 
+                                         scope = 'globalDecile') %>%
       filter(period %in% c('2030','2050','2100'),
              category != 'Other commodities') %>%
       mutate(category = factor(category, levels = allSec))
@@ -2813,7 +2711,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         )
       
       
-      p[[paste0("secBurdenByGlobalDecile",scen)]] <- list(
+      p[[paste0("decileColiGlobalbyDecile",scen)]] <- list(
         plot = plot_base
         ,
         
@@ -2821,7 +2719,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         height = 5
         
       )
-      
       iter = iter + 1
     }
 
@@ -2835,19 +2732,18 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
     
   }
   
-  
-  if(any(plotlist == 'secBurdenByRegDecile' | allExport  )){
+  if(any(plotlist == 'decileColiRegbyDecile' | allExport  )){
     
-    plotdf <- aggregate_decileWelfChange(data1 = data1, data2 = data2, 
-                                         secLevel = c("all"), scope = 'decile') %>%
+    plotdf <- aggregate_decileWelfChange(data1 = dfDecileWelfChange, 
+                                         data2 = dfDecileConsShare, 
+                                         secLevel = c("all"), 
+                                         scope = 'decile') %>%
       filter(period %in% c('2030','2050','2100'),
              category %in% c(foodSec,eneSec)) %>%
-      mutate(category = factor(category, levels = c(foodSec,eneSec)) )
-    
+      mutate(category = factor(category, levels = c(foodSec,eneSec)))
     
     iter = 1
 
-    
     for(scen in plotdf$scenario %>% unique ) {
       
       plot_base <- ggplot(plotdf %>% filter(scenario == scen), 
@@ -2878,7 +2774,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       #   plot_base <- plot_base + theme( axis.title.x = element_blank() )
       # }
       
-      p[[paste0("secBurdenByRegDecile",scen)]] <- list(
+      p[[paste0("decileColiRegbyDecile",scen)]] <- list(
         plot = plot_base,
         
         width  = 12,
@@ -2888,24 +2784,19 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
       iter = iter + 1
     }
-    
-    
-    
+
   }
   
-  
-  #----------------------End 8. burden on deciles---------------
-  
+#----------------------End 8. burden on deciles---------------
   
   
-  #--------------------------9. Remind Region map----------------------------
+  
+#--------------------------9. Remind Region map----------------------------
   
   if(any(plotlist == 'remindRegionMap' | allExport  )){
   
-    
-    
     # Read in regional mapping   
-    if(regions =='H12') {
+    if(regions == 'H12') {
       
       regionMapping <- read_delim("input/regionmappingH12.csv", 
                                   delim = ";", escape_double = FALSE, col_types = cols(X = col_skip()), 
@@ -2924,19 +2815,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
                region = RegionCode)
     }
     
-    
-    gini <- plotdataIneq[['ineq']] %>%
+    gini <- dfIneqAll$ineqAll %>%
       filter( period <= 2100,
               region != 'World',
               variable %in% c('ineq|Gini'))
-    
-    
+
     gini_ref <- gini %>% filter(scenario == 'C_SSP2-NPi2025') %>%
       select(-scenario,-category) %>%
       rename(ref = value) %>%
       filter(period == 2040)
 
-    # 1. World country polygons
     world <- rnaturalearth::ne_countries(
       scale = "medium",
       returnclass = "sf"
@@ -2961,8 +2849,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       ) %>%
       st_drop_geometry()
     
-
-    
     centroids_gini <- centroids %>%
       left_join(gini_ref, by = "region")
     
@@ -2984,16 +2870,30 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         lat = if_else(region == "OAS",   5,  lat)  # ~ Southeast Asia latitude
       )
     
+    ref <- dfIneqAll$ineqAll %>%
+      filter(period == 2060, region != "World", variable == "ineq|Gini",
+             scenario == "C_SSP2-NPi2025") %>%
+      summarise(ref = mean(value, na.rm = TRUE), .by = region)
+    
+    regOrder <- dfIneqAll$ineqAll %>%
+      filter(period == 2060, region != "World", variable == "ineq|Gini",
+             category == "TotalWithTransfNeut", scenario == scen) %>%
+      summarise(pol = mean(value, na.rm = TRUE), .by = region) %>%
+      inner_join(ref, by = "region") %>%
+      mutate(change = (pol - ref) * 100) %>%
+      arrange(change) %>%
+      pull(region)
+    
+    world_reg <- world_reg %>%
+      mutate(region = factor(region, levels = regOrder))
     
     p[['remindRegionMap']] <- list(
-      plot = ggplot() +
+      plot = ggplot(world_reg) +
         # REMIND regions: colored by region
         geom_sf(
-          data  = world_reg,
           aes(fill = region),
           color    = "grey60",
-          linewidth = 0.2,
-          alpha    = 0.7
+          linewidth = 0.2
         ) +
         # # Gini dots
         # geom_point(
@@ -3013,6 +2913,7 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         coord_sf(expand = FALSE) +
         # DISCRETE fill scale for regions
         scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
+        guides(fill = "none") +
         # CONTINUOUS color scale for Gini dots
         scale_color_gradient(
           name     = "Gini (2040)",
@@ -3033,18 +2934,27 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       
     )
     
-    
-    
   }
-  
-  
-  
-  
+ 
   if(any(plotlist == 'regionIneqChangeBar_Gini' | allExport  )){
+    
+    ref <- dfIneqAll$ineqAll %>%
+      filter(period == 2060, region != "World", variable == "ineq|Gini",
+             scenario == "C_SSP2-NPi2025") %>%
+      summarise(ref = mean(value, na.rm = TRUE), .by = region)
+    
+    regOrder <- dfIneqAll$ineqAll %>%
+      filter(period == 2060, region != "World", variable == "ineq|Gini",
+             category == "TotalWithTransfNeut", scenario == scen) %>%
+      summarise(pol = mean(value, na.rm = TRUE), .by = region) %>%
+      inner_join(ref, by = "region") %>%
+      mutate(change = (pol - ref) * 100) %>%
+      arrange(change) %>%
+      pull(region)
     
     for(scen in paste0( 'C_',all_runscens,'-',all_budgets)){
       
-      gini <- plotdataIneq[['ineq']] %>%
+      gini <- dfIneqAll$ineqAll %>%
         filter( period <= 2100,
                 region != 'World',
                 variable %in% c('ineq|Gini'))
@@ -3053,35 +2963,19 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
         select(-scenario,-category) %>%
         rename(ref = value)
       
-      
       plotdf <- gini %>%
         filter(scenario != 'C_SSP2-NPi2025') %>%
         left_join(gini_ref, by = c('region', 'period', 'variable')) %>%
         rename(pol = value) %>%
         mutate(change = (pol - ref) * 100,
                variable ='ineq|deltaGini') %>%
-        mutate(scenario = factor(scenario, levels = c(
-          "C_SSP2-loOS-def", 
-          "C_SSP2-hiOS-def",
-          "C_SSP2-PkBudg1000",
-          "C_SSP2-PkBudg650"
-          
-        )),
+        mutate(scenario = factor(scenario, levels = scenario_levels),
         category = factor(category, levels = c(
           'TotalWithTransfNeut',
           'TotalWithTransfEpc'
         ))) %>% 
         filter( period %in% c(2040, 2060, 2100),
                 scenario == scen)
-      
-      regOrder <- plotdf %>% 
-        filter(
-          period   == 2060,
-          scenario == scen,
-          category == "TotalWithTransfNeut"
-        ) %>%
-        arrange(change) %>%          # ascending; use desc(change) for reverse
-        pull(region)
       
       max_abs <- 5
       
@@ -3093,7 +2987,6 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           sign_change = sign(change),
           label_y     = change_cap +2.5 + 0.5 * sign_change  # a bit beyond capped bar
         )
-      
       
       p[[paste0('regionIneqChangeBar_Gini_',scen)]] <- list(
         
@@ -3114,11 +3007,16 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
           scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
           labs(
             x = NULL,
-            y = "Gini change (points)",
-            title    = "Gini change from reference",
-            subtitle = scen
+            y = "Gini change from NPi(pp)",
+            # title    = "Gini change from reference",
+            subtitle =  scenario_labels[[scen]]
           ) +
-          facet_grid(category ~ period) +
+          facet_grid(category ~ period, 
+                     labeller = labeller(
+                       category = c(
+                         TotalWithTransfNeut = "Neutral",
+                         TotalWithTransfEpc  = "EPC"
+                       ))) +
           theme_minimal() +
           theme(
             panel.grid.major.y = element_blank(),
@@ -3134,20 +3032,12 @@ plot_output <- function(outputPath, data1, data2, data3, plotdataIneq,  plotlist
       )
     }
   }
-  
-  
-  
-  
-  
-  
-  
-  #------------------------------End-----------------------------------------
-  
+
+#------------------------------End-----------------------------------------
   
   if(isDisplay){
     print(p)
   }
-  
   
   
   if(isExport|allExport){

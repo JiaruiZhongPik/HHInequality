@@ -51,11 +51,29 @@ plot_outputNCC <- function(){
                                             tag_margin_r = 4,
                                             axis_title_y_margin_r = 6,
                                             word_format = c("svg","emf","png"), png_dpi = 300,
-                                            collect_guides = TRUE, legend_position = "bottom", legend_direction = "horizontal") {
+                                            collect_guides = TRUE, legend_position = "bottom", 
+                                            legend_direction = "horizontal",
+                                            legend_box = "vertical") {
     
     type <- match.arg(type); layout <- match.arg(layout); word_format <- match.arg(word_format)
     if (!is.list(plots)) plots <- list(plots)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+    
+    plots <- lapply(plots, function(p) {
+      p +
+        guides(
+          color    = guide_legend(nrow = 1, byrow = TRUE,order = 1),
+          linetype = guide_legend(nrow = 1, byrow = TRUE,order = 2)
+        ) +
+        theme(
+          legend.position   = legend_position,
+          legend.direction  = legend_direction,
+          legend.box        = legend_box,
+          legend.text       = element_text(lineheight = 0.9),
+          legend.key.height = unit(0.5, "lines"),
+          legend.spacing.y  = unit(0.5, "cm")
+        )
+    })
     
     dims <- nature_dims(type, caption_words)
     height_mm <- if (is.null(custom_height_mm)) dims$max_height_mm else custom_height_mm
@@ -65,14 +83,10 @@ plot_outputNCC <- function(){
     if (!is.null(rel_heights)) wrap <- wrap + plot_layout(heights = rel_heights)
     wrap <- wrap + plot_layout(guides = if (collect_guides) "collect" else "keep") &
       theme(plot.margin = margin(t = 3.5, r = 2, b = 1, l = 2, unit = "mm")) &
-      theme(legend.position = legend_position,
-            legend.direction = legend_direction,
-            #legend.margin   = margin(t = -3, b = 0, r = 20, l = 20, unit = "mm"),  # pull legend closer up
-            legend.margin   = margin(t = -3, b = 0, r = 0, l = -5, unit = "mm"),  #
-            legend.spacing  = unit(10, "mm"),                      # reduce gaps between items
-            legend.box = if (legend_direction == "horizontal") "horizontal" else "vertical",
-            legend.key.width  = unit(5, "mm"),   # make keys wider/narrower
-            legend.key.height = unit(4, "mm"))     # and their height
+      theme(
+        legend.position = legend_position,
+        legend.margin   = margin(t = -3, b = 0, r = 0, l = 0, unit = "mm")
+      )
     wrap <- wrap + plot_annotation(tag_levels = tag_levels, tag_prefix = tag_prefix, tag_suffix = tag_suffix) &
       theme(
         plot.tag.position = c(tag_x, tag_y),                    # move "a"/"b"
@@ -157,7 +171,9 @@ plot_outputNCC <- function(){
                                       tag_size = 9,
                                       axis_title_y_margin_r = 6,
                                       word_format = c("svg","emf","png"), png_dpi = 300,
-                                      collect_guides = TRUE, legend_position = "bottom", legend_direction = "horizontal") {
+                                      collect_guides = TRUE, legend_position = "bottom", 
+                                      legend_direction = "horizontal",
+                                      legend_box = "vertical") {
     
     type <- match.arg(type); word_format <- match.arg(word_format)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
@@ -185,100 +201,77 @@ plot_outputNCC <- function(){
       png_dpi = png_dpi,
       collect_guides = collect_guides,
       legend_position = legend_position,
-      legend_direction = legend_direction
+      legend_direction = legend_direction,
+      legend_box = legend_box
     )
   }
   
   
  # Figures for the main text
-
-
+  
+  
+  plotList1 <- c('welfByPeriodShaded','taxRevenueOptionWorld',
+    'welfByDecileNeut','welfByDecileEpc')
   
   figure1 <- plot_output(outputPath = outputPath, 
-                         data1 = decileWelfChange, 
-                         data2 = decileConsShare, 
-                         data3 = data, 
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('taxRevenueWorld','ineqWorldWithTransf_Gini'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
+                         decileWelfChange = decileWelfChange, 
+                         decileConsShare = decileConsShare, 
+                         anchRealCons = anchRealCons,
+                         data = data, 
+                         ineqAll = ineqAll,
+                         ineqChannel = ineqChannel,
+                         plotlist = plotList1 ,
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
+  #reorder
+  figure1 <- figure1[plotList1]
   
-  figure2 <- plot_output(outputPath = outputPath,
-                         data1  = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('welfByPeriod','foodEneContribution'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
+  
+  
+  
+  plotList2 <- c('remindRegionMap', 'regionIneqChangeBar_Gini')
+  figure2 <- plot_output(outputPath = outputPath, 
+                         decileWelfChange = decileWelfChange, 
+                         decileConsShare = decileConsShare, 
+                         anchRealCons = anchRealCons,
+                         data = data, 
+                         ineqAll = ineqAll,
+                         ineqChannel = ineqChannel,
+                         plotlist = plotList2 ,
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
+  
+  plotList3 <- c('regColiBySecSelect')
+  figure3 <- plot_output(outputPath = outputPath, 
+                         decileWelfChange = decileWelfChange, 
+                         decileConsShare = decileConsShare, 
+                         anchRealCons = anchRealCons,
+                         data = data, 
+                         ineqAll = ineqAll,
+                         ineqChannel = ineqChannel,
+                         plotlist = plotList3 ,
+                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
 
-
-
-  figure3 <- plot_output(outputPath = outputPath,
-                         data1 = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('ineqGlobalBetweenWithinTheilL','ineqGlobalWithinRegTheilL'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
-  
-  
-  
-  figure4 <- plot_output(outputPath = outputPath,
-                         data1 = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('ineqTheilLRegBySecbyScen'),
+  figure4 <- plot_output(outputPath = outputPath, 
+                         decileWelfChange = decileWelfChange, 
+                         decileConsShare = decileConsShare, 
+                         anchRealCons = anchRealCons,
+                         data = data, 
+                         ineqAll = ineqAll,
+                         ineqChannel = ineqChannel,
+                         plotlist = 'ineqRegBySecSelected_Gini' ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   
-  figure5 <- plot_output(outputPath = outputPath,
-                         data1 = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('theilSectorDriver'),
+  figure5 <- plot_output(outputPath = outputPath, 
+                         decileWelfChange = decileWelfChange, 
+                         decileConsShare = decileConsShare, 
+                         anchRealCons = anchRealCons,
+                         data = data, 
+                         ineqAll = ineqAll,
+                         ineqChannel = ineqChannel,
+                         plotlist = 'categoryColiVsIneq' ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
-
-  figure6 <- plot_output(outputPath = outputPath,
-                         data1 = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('secBurdenByDecile'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
-  
-  figure7 <- plot_output(outputPath = outputPath,
-                         data1 = decileWelfChange,
-                         data2 = decileConsShare,
-                         data3 = data,
-                         plotdataIneq = ineq,
-                         exampleReg = 'IND',
-                         plotlist = c('ineqRegGiniEpc'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
-  
-  
-  #Figure for appendix
-  
-  
-  figure_a1 <- plot_output(outputPath = outputPath, 
-                         data1 = decileWelfChange, 
-                         data2 = decileConsShare, 
-                         data3 = data, 
-                         plotdataIneq = ineq,
-                         exampleReg = NA,
-                         plotlist = c('ineqWorldWithTransf_Theil'),
-                         micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = F)
-  
-  
-  
-  
+ 
   
   
   dir <- paste0(outputPath,'/ncc')
@@ -293,10 +286,12 @@ plot_outputNCC <- function(){
     dir =   dir,
     stem = "Figure1",
     type = "research_2col",
-    caption_words = 120,
-    ncol = 1,
+    caption_words = 160,
+    ncol = 2,
     collect_guides = F,
-    custom_height_mm = 140,
+    custom_height_mm = 160,
+    legend_direction = "horizontal",
+    legend_box = 'vertical',
     word_format = "png"     # or "emf"/"png"
   )
   
@@ -307,8 +302,10 @@ plot_outputNCC <- function(){
     type = "research_2col",
     caption_words = 120,
     ncol =1,
-    collect_guides = F,
-    custom_height_mm = 140,
+    collect_guides = T,
+    legend_position = 'right',
+    custom_height_mm = 210,
+    legend_direction = "vertical",
     word_format = "png",
     tag_x = 0.05,tag_y = 1.1
   )
@@ -322,40 +319,27 @@ plot_outputNCC <- function(){
     caption_words = 120,
     ncol = 1,
     collect_guides = F,
-    custom_height_mm = 140,
+    legend_position = 'bottom',
+    legend_direction = "horizontal",
+    custom_height_mm = 160,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
   )
   
-
-
   nature_export_from_list(
     figure4,
     dir =   dir,
     stem = "Figure4",
     type = "research_2col",
-    caption_words = 160,
-    ncol = 1,
-    collect_guides = F,
-    custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
-  )
-  
-  
-
-  nature_export_from_list(
-    figure5,
-    dir =   dir,
-    stem = "Figure5",
-    type = "research_2col",
     caption_words = 120,
     ncol = 1,
     collect_guides = F,
+    legend_position = 'bottom',
+    legend_direction = "horizontal",
     custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1
   )
-  
-  
   
   nature_export_from_list(
     figure5,
@@ -365,36 +349,93 @@ plot_outputNCC <- function(){
     caption_words = 120,
     ncol = 1,
     collect_guides = F,
-    custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
-  )
-  
-  
-  nature_export_from_list(
-    figure6,
-    dir =   dir,
-    stem = "Figure6",
-    type = "research_2col",
-    caption_words = 120,
-    ncol = 1,
-    collect_guides = T,
+    legend_position = 'none',
+    legend_direction = "horizontal",
     custom_height_mm = 140,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
   )
   
+
+  # nature_export_from_list(
+  #   figure4,
+  #   dir =   dir,
+  #   stem = "Figure4",
+  #   type = "research_2col",
+  #   caption_words = 160,
+  #   ncol = 1,
+  #   collect_guides = F,
+  #   custom_height_mm = 160,
+  #   word_format = "png"     # or "emf"/"png"
+  # )
+  # 
+  # 
+  # 
+  # nature_export_from_list(
+  #   figure5,
+  #   dir =   dir,
+  #   stem = "Figure5",
+  #   type = "research_2col",
+  #   caption_words = 120,
+  #   ncol = 1,
+  #   collect_guides = F,
+  #   custom_height_mm = 160,
+  #   word_format = "png"     # or "emf"/"png"
+  # )
+  # 
+  # 
+  # 
+  # nature_export_from_list(
+  #   figure5,
+  #   dir =   dir,
+  #   stem = "Figure5",
+  #   type = "research_2col",
+  #   caption_words = 120,
+  #   ncol = 1,
+  #   collect_guides = F,
+  #   custom_height_mm = 160,
+  #   word_format = "png"     # or "emf"/"png"
+  # )
+  # 
+  # 
+  # nature_export_from_list(
+  #   figure6,
+  #   dir =   dir,
+  #   stem = "Figure6",
+  #   type = "research_2col",
+  #   caption_words = 120,
+  #   ncol = 1,
+  #   collect_guides = T,
+  #   custom_height_mm = 140,
+  #   word_format = "png",
+  #   tag_x = 0.05,tag_y = 1
+  # )
+  # 
+  # 
+  # nature_export_from_list(
+  #   figure7,
+  #   dir =   dir,
+  #   stem = "Figure7",
+  #   type = "research_2col",
+  #   caption_words = 160,
+  #   ncol = 1,
+  #   collect_guides = F,
+  #   custom_height_mm = 160,
+  #   word_format = "png"     # or "emf"/"png"
+  # )
   
-  nature_export_from_list(
-    figure7,
-    dir =   dir,
-    stem = "Figure7",
-    type = "research_2col",
-    caption_words = 160,
-    ncol = 1,
-    collect_guides = F,
-    custom_height_mm = 160,
-    word_format = "png"     # or "emf"/"png"
-  )
+  
+  # nature_export_from_list(
+  #   figure8,
+  #   dir =   dir,
+  #   stem = "Figure7",
+  #   type = "research_2col",
+  #   caption_words = 160,
+  #   ncol = 1,
+  #   collect_guides = F,
+  #   custom_height_mm = 160,
+  #   word_format = "png"     # or "emf"/"png"
+  # )
   
 }
 

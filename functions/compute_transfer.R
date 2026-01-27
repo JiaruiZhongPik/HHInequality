@@ -1,6 +1,7 @@
 
 compute_transfer <- function (data1 = data, data2 = decileConsShare, 
-                              climaFund = 1, fund_return_scale = 1,
+                              taxBase = 'CO2woLUC',
+                              climaFund = 0, fund_return_scale = 1,
                               payg =1,
                               recycle = "neut", revenueRep = 0){
   
@@ -11,30 +12,45 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare,
            period == 2130) %>%
     select(scenario, region, value_2130 = value)
   
+  irVar <- "Interest Rate (t+1)/(t-1)|Real"
+  scens <- paste0("C_", all_runscens, "-", all_budgets)
+  
+  # 1) Decide which tax variables to pull + how to compute `Taxes`
+  taxVars <- switch(
+    taxBase,
+    GHGwoLUC = c("Taxes|GHG|REMIND"),
+    CO2woLUC = c("Taxes|CO2|REMIND"),
+    GHG      = c("Taxes|GHG|REMIND", "Taxes|GHG|MAGPIE"),
+    stop("Unknown taxBase: ", taxBase)
+  )
+  
+  taxExpr <- switch(
+    taxBase,
+    GHGwoLUC = "`Taxes|GHG|REMIND`",
+    CO2woLUC = "`Taxes|CO2|REMIND`",
+    GHG      = "`Taxes|GHG|REMIND` + `Taxes|GHG|MAGPIE`"
+  )
+  
+  # 2) Common pipeline: filter once, patch IR once, then compute Taxes
   df <- data1 %>%
     filter(
-      variable %in% c("Taxes|GHG|MAGPIE", "Taxes|GHG|REMIND", "Interest Rate (t+1)/(t-1)|Real"),
-      scenario %in% paste0( 'C_',all_runscens,'-',all_budgets ),
+      variable %in% c(taxVars, irVar),
+      scenario %in% scens,
       region != "World"
     ) %>%
-    select(-model, -baseline) %>%
+    select(-any_of(c("model", "baseline"))) %>%
     left_join(ir2130, by = c("scenario", "region")) %>%
     mutate(
-      value = if_else(
-        variable == "Interest Rate (t+1)/(t-1)|Real" & period == 2150 & is.na(value),
-        value_2130,
-        value
-      )
+      value = if_else(variable == irVar & period == 2150 & is.na(value),
+                      value_2130, value)
     ) %>%
-    select(-value_2130) %>%
-    calc_addVariable(
-      "`Taxes|GHG`" = "`Taxes|GHG|MAGPIE` + `Taxes|GHG|REMIND`",
-      units         = c("billion US$2017/yr")
-    ) %>% filter(variable %in% c('Taxes|GHG','Interest Rate (t+1)/(t-1)|Real')) 
+    select(-any_of("value_2130")) %>%
+    calc_addVariable("`Taxes`" = taxExpr, units = "billion US$2017/yr") %>%
+    filter(variable %in% c("Taxes", irVar))
   
-  ir  <- df %>% filter(variable == "Interest Rate (t+1)/(t-1)|Real")  %>% select(scenario, region, period, r = value)
-  rev <- df %>% filter(variable == "Taxes|GHG") %>% select(scenario, region, period, revenue = value)
   
+  ir  <- df %>% filter(variable == irVar)  %>% select(scenario, region, period, r = value)
+  rev <- df %>% filter(variable == "Taxes") %>% select(scenario, region, period, revenue = value)
   
   
   joined <- rev %>%
@@ -181,7 +197,7 @@ compute_transfer <- function (data1 = data, data2 = decileConsShare,
       mutate( transferNeut =  revenue_ca * consShare * 10) %>%
       select(scenario, region, period,decileGroup,transferNeut)
     
-    if(payg ==1) {
+    if(payg == 1) {
       transfer <- transfer %>% 
         mutate(
           transferNeut = if_else(transferNeut < 0, 0, transferNeut)

@@ -146,7 +146,14 @@ coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "")
   out
 }
 
-
+add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
+  if (regressRegGrouping == "pool") {
+    df %>% dplyr::mutate(region = "pool")
+  } else {
+    if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
+    df %>% dplyr::left_join(regionMapping, by = "geo")
+  }
+}
 
 getHistTailExpForBlending <- function(
     regressRegGrouping = "H12",
@@ -155,9 +162,9 @@ getHistTailExpForBlending <- function(
     patchChaFromGcdRegional = TRUE
 ) {
   # MCC (main)
-  hhMcc <- prep_mcc(sum_share_range = mccSumShareRange)
-  regionMapping <- if (regressRegGrouping %in% c("H12", "H21")) load_region_mapping(regressRegGrouping) else NULL
-  hhMcc <- add_region_tag(hhMcc, regressRegGrouping, regionMapping)
+  hhMcc <- prepare_mccData(sumShareRange = mccSumShareRange)
+  regionMapping <- if (regressRegGrouping %in% c("H12", "H21")) load_regionMapping(regressRegGrouping) else NULL
+  hhMcc <- add_regionTag(hhMcc, regressRegGrouping, regionMapping)
   
   tailMcc <- computeHistTailExpByRegion(
     expTbl = hhMcc %>% dplyr::select(region, exp, weight),
@@ -167,8 +174,8 @@ getHistTailExpForBlending <- function(
   
   # Patch CHA with GCD regional exp distribution (if requested)
   if (patchChaFromGcdRegional) {
-    hhGcd <- prep_gcd(isDisplay = FALSE, isExport = FALSE)
-    hhGcd <- add_region_tag(hhGcd, regressRegGrouping, regionMapping)
+    hhGcd <- prepare_gcdData(isDisplay = FALSE, isExport = FALSE)
+    hhGcd <- add_regionTag(hhGcd, regressRegGrouping, regionMapping)
     
     tailGcd <- computeHistTailExpByRegion(
       expTbl = hhGcd %>% dplyr::select(region, exp, weight),
@@ -348,10 +355,10 @@ prepareConsShare <- function(data, regions, gini_baseline,
 
 predict_decileConsShare <- function(
     data, coef, gini_baseline,
-    regression_model = "logitTransOLS",
+    regressModel = "logitTransOLS",
     countryExample = NA,
     isDisplay = FALSE, isExport = FALSE,
-    # ---- NEW: blending options ----
+    # blending options
     doBlending = FALSE,
     blendTailProb = 0.95,
     blendEndFactor = 2,
@@ -413,7 +420,7 @@ predict_decileConsShare <- function(
         str_starts(variable, "share\\|")
     ) %>%
     pivot_wider(names_from = variable, values_from = value) %>%
-    mutate(consumptionCA = Consumption / Population *1000)
+    mutate(consumptionCa = Consumption / Population *1000)
   
   dataDecile <- data1 %>%
     calc_addVariable("consumptionCA" = "(`Consumption` *1e9)/(`Population` *1e6)",units = c("US$2017") )%>%
@@ -447,7 +454,7 @@ predict_decileConsShare <- function(
   
   
  
-  if (regression_model =='logitTransOLS'){
+  if (regressModel =='logitTransOLS'){
     
     macroWide <- data1 %>%
       dplyr::filter(variable %in% macroVars) %>%
@@ -514,13 +521,13 @@ predict_decileConsShare <- function(
       
       # 1) pooled target is MCC pooled
       coefPool <- analyze_regression(
-        regressModel = regression_model,
+        regressModel = regressModel,
         consData = "mcc",
         regressRegGrouping = "pool",
         allCoef = FALSE,
         isDisplay = FALSE,
         isExport = FALSE,
-        mcc_sum_share_range = mccSumShareRange
+        mccSumShareRange = mccSumShareRange
       )
       
       scenarios <- unique(data1$scenario)
@@ -585,7 +592,7 @@ predict_decileConsShare <- function(
       
       p1 <- ggplot(
         plotdf,
-        aes(x = log(consumptionCA), y = !!sym(sector), color = factor(region))
+        aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
       ) +
         geom_point(alpha = 0.6) +
         facet_wrap(~scenario) +
@@ -689,7 +696,7 @@ predict_decileConsShare <- function(
         # Create p1
         p1 <- ggplot(
           plotdf[plotdf$region == region, ],
-          aes(x = log(consumptionCA), y = !!sym(sector), color = factor(region))
+          aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
         ) +
           geom_point(alpha = 0.6) +
           facet_wrap(~scenario) +

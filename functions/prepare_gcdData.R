@@ -121,8 +121,24 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
     distinct() %>%
     select(-area, -countryname, -coicop, -sex, -ageGroup)
 
-  dfFinal <- bind_rows(dfH,dfPop,dfExp)
+  dfLong <- bind_rows(dfH,dfPop,dfExp)
   
+  
+  dfWide <- dfLong %>%
+    dplyr::select(-dplyr::any_of("unit")) %>%
+    dplyr::group_by(geo, year, incomegroup, variable) %>%
+    dplyr::summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+    tidyr::pivot_wider(names_from = variable, values_from = value)
+
+  # unify weight naming
+  if ("popShare" %in% names(dfWide)) {
+    dfWide <- dfWide %>% dplyr::mutate(weight = popShare)
+  } else if ("pop" %in% names(dfWide)) {
+    dfWide <- dfWide %>% dplyr::mutate(weight = pop)
+  } else {
+    stop("GCD data has neither popShare nor pop. Add a weight column.")
+  }
+
   
   
   #Visualize country coverage of database
@@ -132,7 +148,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
   
   # Step 2: Prepare availability info
   world_mapped <- world %>%
-    mutate(data_available = ifelse(iso_a3 %in% dfFinal$geo, "Yes", "No"))
+    mutate(data_available = ifelse(iso_a3 %in% dfLong$geo, "Yes", "No"))
   
   # Step 3: Plot
   plotCoverage <- ggplot(world_mapped) +
@@ -171,11 +187,7 @@ prepare_gcdData <- function (isDisplay = FALSE,isExport = FALSE) {
     )
   }
   
- 
-  
-  
-  
-  return(dfFinal)
+  return(dfWide)
   
 }
 
