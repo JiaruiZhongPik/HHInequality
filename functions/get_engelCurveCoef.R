@@ -2,7 +2,6 @@
 #on mcc or gcd dataset.
 
 get_engelCurveCoef <- function(
-    regressModel       = "logitTransOLS",
     #The follwoing 2 options defines the basic regional estimates
     dataSource         = c("mcc", "gcd"),
     regressRegGrouping = "H12",              # "pool" => pooled; otherwise => regional
@@ -91,7 +90,6 @@ get_engelCurveCoef <- function(
   fetchCoef <- function(consData, grouping) {
     if (identical(consData, "mcc")) {
       analyze_regression(
-        regressModel = regressModel,
         consData = "mcc",
         regressRegGrouping = grouping,
         allCoef = FALSE,
@@ -101,7 +99,6 @@ get_engelCurveCoef <- function(
       )
     } else {
       analyze_regression(
-        regressModel = regressModel,
         consData = "gcd",
         regressRegGrouping = grouping,
         allCoef = FALSE,
@@ -196,8 +193,7 @@ get_engelCurveCoef <- function(
 }
 
 
-analyze_regression <- function(regressModel = "logitTransOLS",
-                               consData = c("gcd", "mcc"),
+analyze_regression <- function(consData = c("gcd", "mcc"),
                                regressRegGrouping = "pool",
                                allCoef = FALSE,
                                isDisplay = TRUE,
@@ -233,7 +229,6 @@ analyze_regression <- function(regressModel = "logitTransOLS",
   
   out <- estimate_engelCore(
     hh = hh,
-    regressModel = regressModel,
     eps = 1e-6,
     add_country_fe = TRUE,
     allCoef = allCoef
@@ -286,12 +281,11 @@ load_regionMapping <- function(regressRegGrouping) {
 
 #Helper: regression engine
 estimate_engelCore <- function(hh,
-                                regressModel = c("logitTransOLS", "polynomialLM"),
                                 eps = 1e-6,
                                 add_country_fe = TRUE,
                                 allCoef = FALSE) {
   
-  regressModel <- match.arg(regressModel)
+
   
   # identify share columns
   share_cols <- names(hh)[grepl("^share\\|", names(hh))]
@@ -330,14 +324,6 @@ estimate_engelCore <- function(hh,
       
       fe_ok <- add_country_fe && dplyr::n_distinct(df$geo) >= 2
       
-      if (regressModel == "polynomialLM") {
-        rhs <- "log(exp) + I(log(exp)^2)"
-        if (fe_ok) rhs <- paste(rhs, "+ geo")
-        fml <- stats::as.formula(paste0("`", col, "` ~ ", rhs))
-        
-        fit <- stats::lm(fml, data = df, weights = df$weight)
-        
-      } else {
         # logitTransOLS
         y_clip <- pmin(pmax(df[[col]], eps), 1 - eps)
         df$y_logit <- qlogis(y_clip)
@@ -347,7 +333,7 @@ estimate_engelCore <- function(hh,
         fml <- stats::as.formula(paste0("y_logit ~ ", rhs))
         
         fit <- stats::lm(fml, data = df, weights = df$weight)
-      }
+      
       
       broom::tidy(fit) %>%
         dplyr::mutate(share = col, region = region_name)

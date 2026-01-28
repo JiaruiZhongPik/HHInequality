@@ -88,8 +88,7 @@ REMIND_pattern <- "REMIND_generic*.mif"
 
 #Model setting
 regions <- 'H12'                            # options are H12 or H21, seemingly redundant
-regressModel<-"logitTransOLS"               # other available options are  "logitTransOLS", 'polynomialLM'
-regressRegGrouping <- 'H12'                 # options are: "H12", "H21", "pool"
+regressRegGrouping <- 'H12'                 # determines regional heterogeneity of Engel curves, options are: "H12", "H21", "pool"
 consData <- 'mcc'                           # options are: gcd, mcc
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
@@ -154,8 +153,7 @@ decileConsShare <- predict_decileConsShare(
   data,
   coef,
   gini_baseline = gini_baseline,
-  regressModel = regressModel,
-  doBlending = T,
+  doBlending = T,                   #blending is only a option when dataSource is 'mcc'
   blendTailProb = 0.99,
   blendEndFactor = 2,
   blendingRegGrouping = "H12",
@@ -180,7 +178,6 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare,
                                              fixed_point = fixed_point) # unit log different change in %
 
 
-
 #anchored decile real consumption
 anchRealCons <- compute_anchoredRealCons(
   decileWelfChange = decileWelfChange,
@@ -189,13 +186,6 @@ anchRealCons <- compute_anchoredRealCons(
   doChecks         = TRUE
 )
 
-
-
-# #To be deleded
-# ineq <- compute_inequalityMetrics(data1 = decileWelfChange, 
-#                                   data2 = decileConsShare, 
-#                                   data3 = data,
-#                                   montecarlo = TRUE, n_perms = 300)
 
 #compute the overall inequality change
 ineqAll <- compute_inequalityOutcomes(decileWelfChange,
@@ -212,8 +202,6 @@ ineqChannel <- compute_priceChannelShapley(
   n_perms = 300
 )
 
-
-                                                                                                                                                                                              #Todo: a function computes the percentage change of real consumption at the baseline consumption level
 
 
 #-------Plot-------
