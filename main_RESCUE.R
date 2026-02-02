@@ -21,7 +21,6 @@ source('functions/plot_output.R')
 source('functions/plot_outputNCC.R')
 source('functions/aggregate_decileWelfChange.R')
 source('functions/compute_anchoredRealCons.R')
-source('functions/compute_inequalityMetrics.R')
 source('functions/compute_inequalityOutcomes.R')
 source('functions/compute_priceChannelShapley.R')
 source('functions/compute_transfer.R')
@@ -69,8 +68,7 @@ library(iIneq)
 library(paletteer)
 library(grid)
 library(colorspace)
-options(dplyr.summarise.inform = FALSE,
-        scipen = 999)
+options(scipen = 999)
 
 
 
@@ -97,7 +95,7 @@ taxBase <- 'CO2woLUC'                       # options: ‘CO2woLUC’，'GHGwoLU
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'EAERE','-','Anchor','-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'nB_RAS' ,'-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -140,7 +138,6 @@ data <-  read_csv("tmp/taxRemindFixed.csv") %>%
 coef <- get_engelCurveCoef(
   dataSource = "mcc",
   regressRegGrouping = "H12",
-  regionList = setdiff(unique(data$region), "World"),
   regionOverrides = c(
     CHA = "mccPooled",
     JPN = "mccPooled"
@@ -149,13 +146,14 @@ coef <- get_engelCurveCoef(
 
 
 #Predict consumption shares for each regional decile
+#To do:做了RAS是否就不需要blending了
 decileConsShare <- predict_decileConsShare(
   data,
   coef,
   gini_baseline = gini_baseline,
-  doBlending = T,                   #blending is only a option when dataSource is 'mcc'
-  blendTailProb = 0.99,
-  blendEndFactor = 2,
+  doBlending = F,                   #blending is only a option when dataSource is 'mcc'
+  blendStartFactor = 1.5,
+  blendEndFactor = 3,
   blendingRegGrouping = "H12",
   mccSumShareRange = c(0.85, 1.05)
 )
@@ -182,9 +180,7 @@ decileWelfChange <- predict_decileWelfChange(data, decileConsShare,
 anchRealCons <- compute_anchoredRealCons(
   decileWelfChange = decileWelfChange,
   decileConsShare  = decileConsShare,
-  data             = data,
-  doChecks         = TRUE
-)
+  data             = data )
 
 
 #compute the overall inequality change
@@ -192,6 +188,7 @@ ineqAll <- compute_inequalityOutcomes(decileWelfChange,
                               decileConsShare,
                               anchRealCons,
                               data)
+
 
 #compute channelwise contribution
 ineqChannel <- compute_priceChannelShapley(
@@ -229,7 +226,7 @@ p <- plot_output(outputPath = outputPath,
                  data = data, 
                  ineqAll = ineqAll,
                  ineqChannel = ineqChannel,
-                 plotlist = c('categoryColiVsIneq'),
+                 plotlist = c('decileColiRegbyDecile'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots

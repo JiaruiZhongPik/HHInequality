@@ -1,3 +1,14 @@
+# This function computes all inequality metrics, TheilL, TheilT and Gini.
+# It returns a list of 3 component:
+#
+# $ineqAll: stores the overall inequality change of each country-year-scenario and in 
+# all 3 inequaliyt metrics
+#
+# $theilLDecomp: stores the between and within country decomposation of TheilL,
+# 
+# $theilTDecomp: stores the between adn within country decomposation of TheilT
+
+
 compute_inequalityOutcomes <- function(
     decileWelfChange,
     decileConsShare,

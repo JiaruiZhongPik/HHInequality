@@ -11,76 +11,19 @@ get_engelCurveCoef <- function(
     #allowed: "sameRegional","samePooled","mccRegional","mccPooled","gcdRegional","gcdPooled"
     regionOverrides    = NULL,
     
-    #Full list of regions
-    regionList         = NULL,
+    
+    allCoef            = FALSE,
     
     isDisplay          = FALSE
 ) {
   
   dataSource <- match.arg(dataSource)
-  
-  # -----------------------
-  # helpers: assertions
-  # -----------------------
-  assertShapeUnique <- function(coefTbl, name = "coefTbl") {
-    key <- c("region", "sector", "regressor")
-    
-    extraCandidates <- c(
-      "decileGroup", "decile", "percentile",
-      "tau", "quantile", "q",
-      "group", "hhGroup", "incomeGroup"
-    )
-    
-    extra <- intersect(extraCandidates, colnames(coefTbl))
-    key <- c(key, extra)
-    
-    if (!all(c("region", "sector", "regressor") %in% colnames(coefTbl))) {
-      stop(name, " must contain columns: region, sector, regressor.")
-    }
-    
-    bad <- coefTbl %>%
-      dplyr::count(dplyr::across(dplyr::all_of(key)), name = "n") %>%
-      dplyr::filter(n != 1)
-    
-    if (nrow(bad) > 0) {
-      print(bad)
-      stop(
-        name, " has duplicates or missing terms for some keys: (",
-        paste(key, collapse = ", "), ")."
-      )
-    }
-    
-    invisible(TRUE)
+  regionList <- if (regressRegGrouping %in% c("H12", "H21")) {
+    unique(load_regionMapping(regressRegGrouping)$region)
+  } else {
+    character(0)
   }
   
-  assertNamedMap <- function(x, name) {
-    if (is.null(x)) return(invisible(TRUE))
-    if (is.list(x)) x <- unlist(x)
-    if (is.null(names(x)) || any(names(x) == "")) {
-      stop(name, " must be a *named* vector/list: names are region codes.")
-    }
-    invisible(TRUE)
-  }
-  
-  assertOverridesValid <- function(overrides, regions, validKeys) {
-    if (is.null(overrides)) return(invisible(TRUE))
-    if (is.list(overrides)) overrides <- unlist(overrides)
-    
-    # 1) region 名必须在 regionList 里（避免拼错 silently ignored）
-    extraRegions <- setdiff(names(overrides), regions)
-    if (length(extraRegions) > 0) {
-      stop("regionOverrides has regions not in regionList: ", paste(extraRegions, collapse = ", "))
-    }
-    
-    # 2) key 必须合法
-    badKeys <- setdiff(unique(unname(overrides)), validKeys)
-    if (length(badKeys) > 0) {
-      stop("Invalid sourceKey in regionOverrides: ", paste(badKeys, collapse = ", "),
-           ". Valid keys: ", paste(validKeys, collapse = ", "))
-    }
-    
-    invisible(TRUE)
-  }
   
   `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || is.na(x)) y else x
   
@@ -109,7 +52,7 @@ get_engelCurveCoef <- function(
   }
   
   # -----------------------
-  # Mode A: pooled request
+  # pooled request
   # -----------------------
   if (identical(regressRegGrouping, "pool")) {
     coef <- fetchCoef(dataSource, "pool")
@@ -120,32 +63,22 @@ get_engelCurveCoef <- function(
   # -----------------------
   # Build coefficient bank once
   # -----------------------
+  mccRegional <- fetchCoef("mcc", regressRegGrouping)
+  mccPooled   <- fetchCoef("mcc", "pool")
+  gcdRegional <- fetchCoef("gcd", regressRegGrouping)
+  gcdPooled   <- fetchCoef("gcd", "pool")
+  
   coefBank <- list(
-    sameRegional = fetchCoef(dataSource, regressRegGrouping),
-    samePooled   = fetchCoef(dataSource, "pool"),
-    mccRegional  = fetchCoef("mcc", regressRegGrouping),
-    mccPooled    = fetchCoef("mcc", "pool"),
-    gcdRegional  = fetchCoef("gcd", regressRegGrouping),
-    gcdPooled    = fetchCoef("gcd", "pool")
+    mccRegional  = mccRegional,
+    mccPooled    = mccPooled,
+    gcdRegional  = gcdRegional,
+    gcdPooled    = gcdPooled,
+    sameRegional = if (dataSource == "mcc") mccRegional else gcdRegional,
+    samePooled   = if (dataSource == "mcc") mccPooled   else gcdPooled
   )
   
-  # -----------------------
-  # Infer regionList if not provided
-  # -----------------------
-  if (is.null(regionList)) {
-    regA <- unique(coefBank$sameRegional$region)
-    regB <- unique(coefBank$mccRegional$region)
-    regC <- unique(coefBank$gcdRegional$region)
-    regionList <- sort(setdiff(unique(c(regA, regB, regC)), "pool"))
-  }
-  
-  # -----------------------
-  # Validate overrides
-  # -----------------------
-  validKeys <- c("sameRegional", "samePooled", "mccRegional", "mccPooled", "gcdRegional", "gcdPooled")
-  
-  assertNamedMap(regionOverrides, "regionOverrides")
-  assertOverridesValid(regionOverrides, regionList, validKeys)
+
+
   
   if (!is.null(regionOverrides) && is.list(regionOverrides)) {
     regionOverrides <- unlist(regionOverrides)
@@ -188,7 +121,25 @@ get_engelCurveCoef <- function(
   }) %>%
     dplyr::arrange(region, sector, regressor)
   
-  assertShapeUnique(coefPatched, "coefPatched")
+  
+  #USA staples has invalid values, also patch it with global categorical estimates
+  coefPatched  = coefPatched %>%
+    left_join(
+      coefBank$mccPooled %>%
+        filter(sector == "Staples") %>%
+        select(sector, regressor, value_pool = value),
+      by = c("sector", "regressor")
+    ) %>%
+    mutate(
+      value = if_else(
+        region == "USA" & sector == "Staples",
+        value_pool,
+        value
+      )
+    ) %>%
+    select(-value_pool)
+  
+
   coefPatched
 }
 
@@ -232,7 +183,7 @@ analyze_regression <- function(consData = c("gcd", "mcc"),
     eps = 1e-6,
     add_country_fe = TRUE,
     allCoef = allCoef
-  )$coefShape
+  )
   
   if (isExport) {
     if (is.null(export_path)) {
@@ -351,12 +302,15 @@ estimate_engelCore <- function(hh,
     ) %>%
     dplyr::select(region, sector, regressor, value, se)
   
-  coef_shape <- coef_all %>%
-    dplyr::filter(regressor %in% c("log(exp)", "I(log(exp)^2)")) %>%
+  coef_main <- coef_all %>%
+    dplyr::filter(regressor %in% c("log(exp)", "I(log(exp)^2)", "(Intercept)")) %>%
     dplyr::select(-se)
   
-  if (!allCoef) coef_all <- NULL 
-  list( coefShape = coef_shape, 
-        coefAll = coef_all, 
-        obCount = obCount)
+  if (!allCoef) return(coef_main)
+  
+  return(list(
+    coefMain = coef_main,
+    coefAll  = coef_all,
+    obCount  = obCount
+  ))
 }

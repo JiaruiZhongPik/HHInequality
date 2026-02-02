@@ -1,14 +1,33 @@
 
+# =============================================================================
+# Decile-level consumption share projection (Engel curves) with:
+#   1) micro prediction from regional Engel curves and pooled Engel curves
+#   2) blending in SHARE space (NOT logit space)
+#   3) ratio calibration (method A) to ensure macro consistency
+#   4) closure + renormalization (Other commodities)
+#
+# NOTE: This script assumes these external functions already exist in your codebase:
+#   - calc_addVariable()
+#   - analyze_regression()
+#   - prepare_mccData()
+#   - prepare_GiniSDP()
+#   - load_regionMapping()
+# and these objects exist in scope when calling predict_decileConsShare():
+#   - regions, all_runscens, outputPath
+# =============================================================================
 
 
+# =============================================================================
+# Main entry
+# =============================================================================
 predict_decileConsShare <- function(
     data, coef, gini_baseline,
     countryExample = NA,
     isDisplay = FALSE, isExport = FALSE,
     # blending options
     doBlending = FALSE,
-    blendTailProb = 0.95,
-    blendEndFactor = 2,
+    blendStartFactor = 1.5,
+    blendEndFactor = 10,
     blendingRegGrouping = "H12",
     mccSumShareRange = c(0.85, 1.05)
 ) {
@@ -51,16 +70,6 @@ predict_decileConsShare <- function(
         "`FE|++|Transport` * `Price|Transport|FE` / `Consumption`"
     )
   
-  
-  plotdf <-  data1 %>%
-    select(-unit) %>%
-    filter(
-      variable %in% c("Consumption", "FEShare|Household", "Population") |
-        str_starts(variable, "share\\|")
-    ) %>%
-    pivot_wider(names_from = variable, values_from = value) %>%
-    mutate(consumptionCa = Consumption / Population *1000)
-  
   # -----------------------------
   # B) Decile shares input (SSP/SDP)
   # -----------------------------
@@ -75,12 +84,12 @@ predict_decileConsShare <- function(
   # C) Build decile-level expenditure points (dataDecile)
   # -----------------------------
   dataDecile <- data1 %>%
-    dplyr::select(-unit) %>%
     calc_addVariable(
-      "consumptionCA" = "(`Consumption` *1e9)/(`Population` *1e6)",
+      "consumptionCa" = "(`Consumption` *1e9)/(`Population` *1e6)",
       units = c("US$2017")
     ) %>%
-    dplyr::filter(variable == "consumptionCA") %>%
+    dplyr::select(-unit) %>%
+    dplyr::filter(variable == "consumptionCa") %>%
     dplyr::slice(rep(1:dplyr::n(), each = 10)) %>%
     dplyr::group_by(region, period, scenario) %>%
     dplyr::mutate(
@@ -91,7 +100,7 @@ predict_decileConsShare <- function(
     dplyr::left_join(consShare, by = c("period", "region", "gdp_scenario", "decileGroup")) %>%
     dplyr::mutate(
       consumptionCa = value * consShare * 10,
-      logCons  = log(consumptionCa),
+      logCons  = log(pmax(consumptionCa, 1e-12)),
       logCons2 = logCons^2
     ) %>%
     dplyr::select(scenario, region, period, decileGroup, consumptionCa, logCons, logCons2)
@@ -104,19 +113,29 @@ predict_decileConsShare <- function(
     dplyr::select(-unit) %>%
     tidyr::pivot_wider(names_from = variable, values_from = value) %>%
     dplyr::mutate(
-      expMacro = (Consumption * 1e9) / (Population * 1e6)
+      expMacro = (Consumption * 1e9) / (Population * 1e6),
+      # add "Other commodities" on macro side too (closure)
+      `share|Other commodities` = 1 - (
+        `share|Building gases` +
+          `share|Building electricity` +
+          `share|Building other fuels` +
+          `share|Transport energy` +
+          `share|Animal products` +
+          `share|Staples` +
+          `share|Fruits vegetables nuts` +
+          `share|Empty calories`
+      )
     )
   
   # -----------------------------
   # E) Common regression objects
   # -----------------------------
-
-  modeledSectors <- sort(setdiff(unique(coef$sector), "Other commodities"))
+  modeledSectors <- sort(unique(coef$sector))
   scenarios  <- unique(data1$scenario)
   periods    <- unique(data1$period)
-  regionsAll <- sort(unique(data1$region))  # World already removed above
+  regionsAll <- sort(unique(data1$region))
   
-  # Keep old Route-A behavior: if coef is single-region, expand to all regions
+
   coefRegForWide <- if (dplyr::n_distinct(coef$region) == 1) dplyr::mutate(coef, region = "pool") else coef
   
   coefWideReg <- coefToWide(
@@ -127,17 +146,13 @@ predict_decileConsShare <- function(
     suffix    = "Reg"
   )
   
-  fixedReg <- computeFixedEffLogit(
-    macroWide      = macroWide,
-    coefWide       = coefWideReg,
-    modeledSectors = modeledSectors,
-    suffix         = "Reg"
-  )
+  shareCols <- grep("^share\\|", colnames(macroWide), value = TRUE)
   
   # -----------------------------
   # F) Optional pooled objects (only if blending)
   # -----------------------------
   if (doBlending) {
+    
     coefPool <- analyze_regression(
       consData = "mcc",
       regressRegGrouping = "pool",
@@ -155,280 +170,144 @@ predict_decileConsShare <- function(
       suffix    = "Pool"
     )
     
-    fixedPool <- computeFixedEffLogit(
-      macroWide      = macroWide,
-      coefWide       = coefWidePool,
-      modeledSectors = modeledSectors,
-      suffix         = "Pool"
-    )
     
-    #compute historic tail of consumption expenditure
+    # compute historic tail of expenditure distribution (for wBlend)
     hhMcc <- prepare_mccData(sumShareRange = mccSumShareRange)
-    regionMapping <- if (regressRegGrouping %in% c("H12", "H21")) load_regionMapping(regressRegGrouping) else NULL
-    hhMcc <- add_regionTag(hhMcc, regressRegGrouping, regionMapping)
-    
-    tailMcc <- computeHistTailExpByRegion(
-      expTbl = hhMcc %>% dplyr::select(region, exp, weight),
-      tailProb = blendTailProb,
-      weightCol = "weight"
-    )
-    
-    histTailExpByRegion <- tailMcc %>% filter(region != 'CHA') # CHA is removed as MCC only has data for HK and TWN,therefore not representative
+    regionMapping <- if (blendingRegGrouping %in% c("H12", "H21")) load_regionMapping(blendingRegGrouping) else NULL
+    hhMcc <- add_regionTag(hhMcc, blendingRegGrouping, regionMapping)
     
     
-  }
-  
-  # -----------------------------
-  # G) Predict (single exit)
-  # -----------------------------
-  if (doBlending) {
-    dataFull <- predictSharesLogitBlended(
-      dataDecile     = dataDecile,
-      coefWideReg    = coefWideReg,
-      coefWidePool   = coefWidePool,
-      fixedReg       = fixedReg,
-      fixedPool      = fixedPool,
-      histTailExpByRegion = histTailExpByRegion,
-      modeledSectors = modeledSectors,
-      endFactor      = blendEndFactor
-    )
-  } else {
-    dataFull <- predictSharesLogitNoBlend(
-      dataDecile     = dataDecile,
-      coefWideReg    = coefWideReg,
-      fixedReg       = fixedReg,
-      modeledSectors = modeledSectors
-    )
-  }
-  
-  
-  #Visualization
-  if(length(unique(coef$sector)) ==9){
+    histMaxExpByGeo <- hhMcc %>%
+      dplyr::group_by(region) %>%
+      dplyr::summarise(
+        histMaxExp = max(exp, na.rm = TRUE),
+        .groups = "drop"
+      )  %>% dplyr::filter(region != "CHA") # CHA removed as MCC only has HK and TWN -> not representative
     
-    
-    # Function to generate plots per sector
-    plot_sector <- function(sector) {
-      # Convert sector to its equivalent in dfOutput
-      dfOutput_sector <- sub("FEShare", "share", sector)
-      
-      y_vals <- plotdf[[sector]]  # `sector` is assumed to be a character string
-      
-      ylims <- robust_ylim(y_vals)
-      
-      p1 <- ggplot(
-        plotdf,
-        aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
-      ) +
-        geom_point(alpha = 0.6) +
-        facet_wrap(~scenario) +
-        labs(
-          title = paste("REMIND-MAgPIE -", sector),
-          x = "log(ConsumptionCa), US$2017",
-          y = "Share"
-        ) +
-        theme_minimal() +
-        ylim(ylims) +
-        scale_color_brewer(palette = "Paired") +
-        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
-      
-      
-      #Creat P2
-      df_filtered <- dfOutput[dfOutput$decileGroup %in% c(1, 10), ]
-      
-      y_vals <- df_filtered[[dfOutput_sector]]  # make sure dfOutput_sector is a character string
-      
-      ylims <- robust_ylim(y_vals)
-      
-      p2 <- ggplot(
-        dfOutput[dfOutput$decileGroup %in% c(1, 10), ],
-        aes(x = log(consumptionCa), y = !!sym(dfOutput_sector), 
-            color = factor(region), shape = factor(decileGroup))
-      ) +
-        geom_point(alpha = 0.6) +
-        facet_wrap(~scenario) +
-        ylim(ylims) +
-        labs(
-          title = paste("Projected share -", sector),
-          x = "log(ConsumptionCa), US$2017",
-          y = "Share"
-        ) +
-        theme_minimal() +
-        scale_color_brewer(palette = "Paired") +
-        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
-      
-      p1+p2
-      
-    }
-    
-    # Define sectors you want to loop through
-    sectors <- c(
-      "share|Building gases",
-      "share|Building electricity",
-      "share|Building other fuels",
-      "share|Transport energy"
-    )
-    
-    # Generate combined plots for each sector
-    combined_plots <- purrr::map(sectors, plot_sector)
-    
-    # Combine and display all plots in a grid
-    all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
-      theme(legend.position = "bottom") 
-    
-    ggsave(
-      filename = paste0(outputPath, "/combined_FE_share_plot_gcd.tiff"),
-      plot = all_combined_plot,
-      width = 10,
-      height = 12,
-      dpi = 300,
-      compression = "lzw"
-    )
-    
-    # Define sectors you want to loop through
-    sectors <- c(
-      "share|Animal products",
-      "share|Staples",
-      "share|Fruits vegetables nuts",
-      "share|Empty calories"
-    )
-    
-    
-    # Generate combined plots for each sector
-    combined_plots <- purrr::map(sectors, plot_sector)
-    
-    # Combine and display all plots in a grid
-    all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
-      theme(legend.position = "bottom") 
-    
-    ggsave(
-      filename = paste0(outputPath, "/combined_Food_share_plot_gcd.tiff"),
-      plot = all_combined_plot,
-      width = 10,
-      height = 12,
-      dpi = 300,
-      compression = "lzw"
-    ) 
-    
-    
-    if(!all(is.na(countryExample))){
-      
-      
-      # Function to generate plots per sector
-      plot_sector <- function(sector) {
-        # Convert sector to its equivalent in dfOutput
-        dfOutput_sector <- sub("FEShare", "share", sector)
-        
-        # Create p1
-        p1 <- ggplot(
-          plotdf[plotdf$region == region, ],
-          aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
-        ) +
-          geom_point(alpha = 0.6) +
-          facet_wrap(~scenario) +
-          labs(
-            title = paste("REMIND -", sector),
-            x = "log(ConsumptionCa), US$2017",
-            y = "Share"
-          ) +
-          theme_minimal() +
-          ylim(
-            quantile(plotdf[plotdf$region == region, ][[sector]], probs = c(0.01, 0.99), na.rm = TRUE)
-          ) +
-          scale_color_discrete(name = "Region") +
-          geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
-        
-        # Create p2
-        p2 <- ggplot(
-          dfOutput[dfOutput$region == region, ],
-          aes(x = log(consumptionCa), y = !!sym(dfOutput_sector), color = factor(decileGroup))
-        ) +
-          geom_point(alpha = 0.6) +
-          facet_wrap(~scenario) +
-          ylim(
-            quantile(dfOutput[dfOutput$region == region, ][[dfOutput_sector]], probs = c(0.01, 0.99), na.rm = TRUE)
-          ) +
-          labs(
-            title = paste("Projected share -", sector),
-            x = "log(ConsumptionCa), US$2017",
-            y = "Share"
-          ) +
-          theme_minimal() +
-          scale_color_discrete(name = "Decile group") +
-          geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
-        
-        p1+p2
-        
-      }
-      
-      # Define sectors you want to loop through
-      sectors <- c(
-        "share|Building gases",
-        "share|Building electricity",
-        "share|Building other fuels",
-        "share|Transport energy"
-      )
-      
-      for (region in countryExample){
-        combined_plots <- purrr::map(sectors, plot_sector)
-        
-        # Combine and display all plots in a grid
-        all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
-          theme(legend.position = "bottom") 
-        
-        ggsave(
-          filename = paste0(outputPath,"/combined_FE_share_plot_gcd_",region,".tiff"),
-          plot = all_combined_plot,
-          width = 10,
-          height = 12,
-          dpi = 300,
-          compression = "lzw" )
-      }
-      
-      
-      
-      # Define sectors you want to loop through
-      sectors <- c(
-        "share|Animal products",
-        "share|Staples",
-        "share|Fruits vegetables nuts",
-        "share|Empty calories"
-      )
-      
-      for (region in countryExample){
-        # Generate combined plots for each sector
-        combined_plots <- purrr::map(sectors, plot_sector)
-        
-        # Combine and display all plots in a grid
-        all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
-          theme(legend.position = "bottom") 
-        
-        ggsave(
-          filename = paste0(outputPath,"/combined_food_share_plot_gcd_",region,".tiff"),
-          plot = all_combined_plot,
-          width = 10,
-          height = 12,
-          dpi = 300,
-          compression = "lzw"
+
+    # -----------------------------
+    # G) Predict with blending + calibration
+    # -----------------------------
+    # 1) attach wBlend (decile-level)
+
+    dfBase <- dataDecile %>%
+      dplyr::left_join(histMaxExpByGeo, by = "region") %>%
+      dplyr::mutate(
+        wBlend = blendWeightSmoothstep(
+          exp = consumptionCa,
+          histTailExp = histMaxExp,
+          startFactor = blendStartFactor,
+          endFactor = blendEndFactor,
+          useLogSpace = TRUE
         )
-      }
-      
-    }
+      )
+    
+    # 2) raw predictions using pooled Engel Curve
+    sharePoolRaw <- predictSharesLogitRaw(dfBase, coefWidePool,modeledSectors, suffix = "Pool")
+    shareRaw <- predictSharesLogitRaw(dfBase, coefWideReg,modeledSectors, suffix = "Reg")
+    
+    # 3) blend shares
+    shareBlend <- blendShares(shareRaw, sharePoolRaw, modeledSectors, wCol = "wBlend") %>%
+      select(scenario, region, period, decileGroup, consumptionCa, all_of(shareCols) )
+    
+    dataCalibrated <- shareBlend %>%
+      group_by(scenario, region, period) %>%
+      group_modify(function(dfGroup, keys) {
+        
+        # get the macro target row for this group
+        macroRow <- macroWide %>%
+          filter(
+            scenario == keys$scenario,
+            region   == keys$region,
+            period   == keys$period
+          )
+        
+        if (nrow(macroRow) != 1) {
+          stop("macroWide missing or non-unique for group: ",
+               paste(keys$scenario, keys$region, keys$period, sep = " | "))
+        }
+        
+        # build inputs for RAS
+        shareRawMat <- as.matrix(dfGroup[, shareCols, drop = FALSE])
+        wDecile <- dfGroup$consumptionCa
+        
+        macroShare <- as.numeric(macroRow[, shareCols, drop = FALSE])
+        names(macroShare) <- shareCols
+        
+        # run calibration
+        shareCalMat <- weightedRas(
+          shareRawMat = shareRawMat,
+          wDecile     = wDecile,
+          macroShare  = macroShare
+        )
+        
+        # write back with same columns as input
+        dfGroup[, shareCols] <- shareCalMat
+        dfGroup
+      }) %>%
+      ungroup()
+    
+    
+    
+    
+    
+  } else {
+    
+    
+    shareRaw <- predictSharesLogitRaw(dataDecile, coefWideReg, modeledSectors, suffix = "Reg")
+    
+
+    shareRaw <- shareRaw %>%
+      dplyr::select(scenario, region, period, decileGroup, consumptionCa, dplyr::starts_with("share|"))
+    
+  
+    dataCalibrated <- shareRaw %>%
+      group_by(scenario, region, period) %>%
+      group_modify(function(dfGroup, keys) {
+        
+        # get the macro target row for this group
+        macroRow <- macroWide %>%
+          filter(
+            scenario == keys$scenario,
+            region   == keys$region,
+            period   == keys$period
+          )
+        
+        if (nrow(macroRow) != 1) {
+          stop("macroWide missing or non-unique for group: ",
+               paste(keys$scenario, keys$region, keys$period, sep = " | "))
+        }
+        
+        # build inputs for RAS
+        shareRawMat <- as.matrix(dfGroup[, shareCols, drop = FALSE])
+        wDecile <- dfGroup$consumptionCa
+        
+        macroShare <- as.numeric(macroRow[, shareCols, drop = FALSE])
+        names(macroShare) <- shareCols
+        
+        # run calibration
+        shareCalMat <- weightedRas(
+          shareRawMat = shareRawMat,
+          wDecile     = wDecile,
+          macroShare  = macroShare
+        )
+        
+        # write back with same columns as input
+        dfGroup[, shareCols] <- shareCalMat
+        dfGroup
+      }) %>%
+      ungroup()
   }
   
-  dataFull <- 
-    dataFull %>%
-    dplyr::select(scenario, region, period, decileGroup, consumptionCa, dplyr::starts_with("share|"))
-  
-  return(dataFull)
+
+  return(dataCalibrated)
 }
 
 
-# ===========================================================================
-# helpers: This computes weighted quantile, for later computation of regional
-# exp quantile. pop/popShare will be used as weights
-# ===========================================================================
+# =============================================================================
+# helpers: Weighted quantile
+# =============================================================================
 wtdQuantile <- function(x, w, probs = 0.95) {
-  
   stopifnot(length(x) == length(w))
   
   ok <- is.finite(x) & is.finite(w) & w > 0
@@ -439,7 +318,6 @@ wtdQuantile <- function(x, w, probs = 0.95) {
   x <- x[o]; w <- w[o]
   
   cw <- cumsum(w) / sum(w)
-
   keep <- !duplicated(cw)
   
   approx(
@@ -450,14 +328,11 @@ wtdQuantile <- function(x, w, probs = 0.95) {
   )$y
 }
 
-# ===========================================================================
-# helpers: This function computes a tail expenditure threshold (e.g., P95/P99) 
-# from historical data, using weighted quantiles when weights are available and
-# falling back to unweighted quantiles otherwise.
-# ===========================================================================
 
+# =============================================================================
+# helpers: Tail expenditure threshold by region
+# =============================================================================
 computeHistTailExpByRegion <- function(expTbl, tailProb = 0.95, weightCol) {
-  
   stopifnot(all(c("region", "exp") %in% names(expTbl)))
   stopifnot(is.numeric(tailProb), tailProb > 0, tailProb < 1)
   stopifnot(!missing(weightCol), length(weightCol) == 1, is.character(weightCol))
@@ -470,44 +345,50 @@ computeHistTailExpByRegion <- function(expTbl, tailProb = 0.95, weightCol) {
     ) %>%
     dplyr::group_by(region) %>%
     dplyr::summarise(
-      histTailExp = wtdQuantile(exp, .data[[weightCol]], probs = tailProb),
+      histTailExp = {
+        ord <- order(exp)
+        x   <- exp[ord]
+        w   <- .data[[weightCol]][ord]
+        cw  <- cumsum(w) / sum(w)
+        x[which(cw >= tailProb)[1]]
+      },
       .groups = "drop"
     )
 }
 
-# ==============================================================================
-# It returns a smooth blending weight that transitions from regional to pooled 
-# between histTailExp and endFactor * histTailExp. Cubit stpe is used to avoid
-# avoid discontinuity/kins when stitching regimes.
-# ==============================================================================
-blendWeightSmoothstep <- function(exp, histTailExp, endFactor = 2, useLogSpace = TRUE) {
-  stopifnot(endFactor > 1)
+
+# =============================================================================
+# helpers: Smoothstep blending weight (0->1) between histTailExp and endFactor*histTailExp
+# =============================================================================
+
+blendWeightSmoothstep <- function(exp, histTailExp, startFactor = 2, endFactor = 5, useLogSpace = T) {
   
   n <- length(exp)
   if (length(histTailExp) != n) histTailExp <- rep(histTailExp, length.out = n)
   
+  
   endExp <- endFactor * histTailExp
+  startExp <- startFactor * histTailExp
   
   if (useLogSpace) {
-    x  <- log(exp)
-    x0 <- log(histTailExp)
-    x1 <- log(endExp)
+    x  <- log(pmax(exp, 1e-12))
+    x0 <- log(pmax(startExp, 1e-12))
+    x1 <- log(pmax(endExp, 1e-12))
   } else {
     x  <- exp
-    x0 <- histTailExp
+    x0 <- startExp
     x1 <- endExp
   }
   
-  t <- (x - x0) / (x1 - x0)     # 0 at x0, 1 at x1
-  t <- pmax(0, pmin(1, t))      # clamp to [0,1]
-  t^2 * (3 - 2 * t)             # smoothstep weight in [0,1]
+  t <- (x - x0) / (x1 - x0)
+  t <- pmax(0, pmin(1, t))
+  t^2 * (3 - 2 * t)
 }
 
 
-
-# ==============================================================================
-# Formatting the coefficient table
-# ==============================================================================
+# =============================================================================
+# helpers: Coefficient table -> wide
+# =============================================================================
 coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "") {
   
   out <- tidyr::crossing(
@@ -523,24 +404,26 @@ coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "")
     out <- tidyr::crossing(region = regions, out %>% dplyr::select(-region))
   }
   
-  if (nzchar(suffix)) out <- dplyr::rename_with(out, ~ paste0(.x, suffix),
-                                                -dplyr::all_of(c("region","scenario","period")))
+  if (nzchar(suffix)) {
+    out <- dplyr::rename_with(
+      out,
+      ~ paste0(.x, suffix),
+      -dplyr::all_of(c("region","scenario","period"))
+    )
+  }
+  
   out
 }
 
 
-
-# ==============================================================================
-# It reads and prepares the consumption share of each decile in national total
-# consumption, according to different sources of Gini projection. The computation 
-# of consShare is done in mrremind, change are local yet.
-# ==============================================================================
+# =============================================================================
+# helpers: Prepare decile consumption shares (SSP/SDP)
+# =============================================================================
 prepareConsShare <- function(data, regions, gini_baseline,
                              all_runscens,
                              hist_periods = c(2000, 2005, 2010, 2015),
                              input_dir = "input") {
   
-  # --- SSP consumption shares (from .cs4r) ---
   readConsShareSSP <- function(regions, gini_baseline, input_dir) {
     if (!gini_baseline %in% c("rao", "poblete05", "poblete07")) {
       stop("Unsupported gini_baseline: ", gini_baseline)
@@ -563,13 +446,13 @@ prepareConsShare <- function(data, regions, gini_baseline,
   
   shareSSP <- readConsShareSSP(regions, gini_baseline, input_dir)
   
-  # --- SDP shares (Shape / Min et al. 2024) + fill missing historic from SSP1 ---
+  # SDP shares (Shape / Min et al.) + fill missing historic from SSP1
   shareSDP <- prepare_GiniSDP() %>%
     dplyr::mutate(gdp_scenario = as.character(gdp_scenario))
   
   ssp1_hist <- shareSSP %>%
     dplyr::filter(gdp_scenario == "SSP1", period %in% hist_periods) %>%
-    dplyr::select(-gdp_scenario)   # <- key line: remove duplicate name before crossing
+    dplyr::select(-gdp_scenario)
   
   sdp_scenarios <- shareSDP %>%
     dplyr::distinct(gdp_scenario)
@@ -578,17 +461,14 @@ prepareConsShare <- function(data, regions, gini_baseline,
   
   shareSDP_filled <- dplyr::bind_rows(shareSDP, filled_hist)
   
-  # --- combine + create SSP2EU from SSP2 ---
   consShare <- dplyr::bind_rows(shareSSP, shareSDP_filled)
   
+  # create SSP2EU from SSP2
   consShare <- dplyr::bind_rows(
     consShare,
-    consShare %>%
-      dplyr::filter(gdp_scenario == "SSP2") %>%
-      dplyr::mutate(gdp_scenario = "SSP2EU")
+    consShare %>% dplyr::filter(gdp_scenario == "SSP2") %>% dplyr::mutate(gdp_scenario = "SSP2EU")
   )
   
-  # --- filter to scenarios & periods used in the run ---
   consShare %>%
     dplyr::filter(
       gdp_scenario %in% all_runscens,
@@ -597,130 +477,9 @@ prepareConsShare <- function(data, regions, gini_baseline,
 }
 
 
-
-# ==============================================================================
-# Engine for dynamic level calibration, computes the constant term for each 
-# region/year/category
-# ==============================================================================
-computeFixedEffLogit <- function(macroWide, coefWide, modeledSectors, suffix = "") {
-
-  df <- macroWide %>%
-    dplyr::left_join(coefWide, by = c("scenario", "period", "region")) %>%
-    dplyr::mutate(consumptionCaRep = (Consumption * 1e9) / (Population * 1e6))
-  
-  for (s in modeledSectors) {
-    shareCol <- paste0("share|", s)
-    b1Col <- paste0(s, "|log(exp)", suffix)
-    b2Col <- paste0(s, "|I(log(exp)^2)", suffix)
-    outCol <- paste0("fixedEffIntercept|", s, suffix)
-    
-    df[[outCol]] <- qlogis(df[[shareCol]]) -
-      df[[b1Col]] * log(df$consumptionCaRep) -
-      df[[b2Col]] * (log(df$consumptionCaRep)^2)
-  }
-  
-  keep <- c("scenario","period","region", paste0("fixedEffIntercept|", modeledSectors, suffix))
-  df %>% dplyr::select(dplyr::all_of(keep))
-}
-
-
-# ==============================================================================
-# Computing shares using or not using blending
-# ==============================================================================
-predictSharesLogitBlended <- function(
-    dataDecile,
-    coefWideReg, coefWidePool,
-    fixedReg, fixedPool,
-    histTailExpByRegion,
-    modeledSectors,
-    endFactor = 2
-    ) {
-  
-  
-  df <- dataDecile %>%
-    dplyr::left_join(histTailExpByRegion, by = "region") %>%
-    dplyr::left_join(coefWideReg,  by = c("scenario","period","region")) %>%
-    dplyr::left_join(coefWidePool, by = c("scenario","period","region")) %>%
-    dplyr::left_join(fixedReg,     by = c("scenario","period","region")) %>%
-    dplyr::left_join(fixedPool,    by = c("scenario","period","region")) %>%
-    dplyr::mutate(
-      wBlend = blendWeightSmoothstep(
-        exp = consumptionCa,
-        histTailExp = histTailExp,
-        endFactor = endFactor,
-        useLogSpace = TRUE
-      )
-    )
-  
-  logExp  <- log(pmax(df$consumptionCa, 1e-12))
-  logExp2 <- logExp^2
-  
-  for (s in modeledSectors) {
-    b1Reg  <- df[[paste0(s, "|log(exp)Reg")]]
-    b2Reg  <- df[[paste0(s, "|I(log(exp)^2)Reg")]]
-    feReg  <- df[[paste0("fixedEffIntercept|", s, "Reg")]]
-    
-    b1Pool <- df[[paste0(s, "|log(exp)Pool")]]
-    b2Pool <- df[[paste0(s, "|I(log(exp)^2)Pool")]]
-    fePool <- df[[paste0("fixedEffIntercept|", s, "Pool")]]
-    
-    w <- df$wBlend
-    
-    shapeReg  <- b1Reg  * logExp + b2Reg  * logExp2
-    shapePool <- b1Pool * logExp + b2Pool * logExp2
-    
-    shapeBlend <- dplyr::case_when(
-      w <= 0 ~ shapeReg,
-      w >= 1 ~ shapePool,
-      TRUE   ~ (1 - w) * shapeReg + w * shapePool
-    )
-    
-    # FE rule: when w==1, force pooled FE (fixes JPN if feReg is NA)
-    fixedBlend <- dplyr::case_when(
-      w >= 1 ~ fePool,
-      w <= 0 ~ feReg,
-      TRUE   ~ (1 - w) * feReg + w * fePool   # or just feReg if you don't want FE blending
-    )
-    
-    yBlend <- shapeBlend + fixedBlend
-    df[[paste0("share|", s)]] <- plogis(yBlend)
-  }
-  
-  # closure
-  modeledShareCols <- paste0("share|", modeledSectors)
-  df[["share|Other commodities"]] <- 1 - rowSums(df[, modeledShareCols, drop = FALSE], na.rm = TRUE)
-  
-  df
-} 
-
-predictSharesLogitNoBlend <- function(
-    dataDecile,
-    coefWideReg,
-    fixedReg,
-    modeledSectors
-) {
-  df <- dataDecile %>%
-    dplyr::left_join(coefWideReg, by = c("scenario","period","region")) %>%
-    dplyr::left_join(fixedReg,    by = c("scenario","period","region"))
-  
-  logExp  <- df$logCons
-  logExp2 <- df$logCons2
-  
-  for (s in modeledSectors) {
-    b1 <- df[[paste0(s, "|log(exp)Reg")]]
-    b2 <- df[[paste0(s, "|I(log(exp)^2)Reg")]]
-    fe <- df[[paste0("fixedEffIntercept|", s, "Reg")]]
-    
-    df[[paste0("share|", s)]] <- plogis(b1 * logExp + b2 * logExp2 + fe)
-  }
-  
-  modeledShareCols <- paste0("share|", modeledSectors)
-  df[["share|Other commodities"]] <- 1 - rowSums(df[, modeledShareCols, drop = FALSE], na.rm = TRUE)
-  
-  df
-}
-
-
+# =============================================================================
+# helpers: Add region tag to microdata for tail computation
+# =============================================================================
 add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
   if (regressRegGrouping == "pool") {
     df %>% dplyr::mutate(region = "pool")
@@ -728,4 +487,119 @@ add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
     if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
     df %>% dplyr::left_join(regionMapping, by = "geo")
   }
+}
+
+
+# =============================================================================
+# Micro prediction: raw shares from one coefficient set (Reg or Pool)
+# =============================================================================
+predictSharesLogitRaw <- function(dataDecile, coefWide, modeledSectors, suffix = "") {
+  df <- dataDecile %>%
+    dplyr::left_join(coefWide, by = c("scenario","period","region"))
+  
+  logExp  <- df$logCons
+  logExp2 <- df$logCons2
+  
+  for (s in modeledSectors) {
+    b1 <- df[[paste0(s, "|log(exp)", suffix)]]
+    b2 <- df[[paste0(s, "|I(log(exp)^2)", suffix)]]
+    fe <- df[[paste0(s, "|(Intercept)",suffix)]]
+    df[[paste0("share|", s)]] <- plogis(b1 * logExp + b2 * logExp2 + fe)
+  }
+  
+  df
+}
+
+
+# =============================================================================
+# SHARE-space blending between dfReg and dfPool using wBlend (NA->pool)
+blendShares <- function(dfReg, dfPool, modeledSectors, wCol = "wBlend") {
+  keys <- c("scenario","region","period","decileGroup","consumptionCa","logCons","logCons2", wCol)
+  
+  # sanity: keys must exist
+  missReg  <- setdiff(keys, names(dfReg))
+  missPool <- setdiff(keys, names(dfPool))
+  if (length(missReg)  > 0) stop("dfReg missing keys: ", paste(missReg, collapse = ", "))
+  if (length(missPool) > 0) stop("dfPool missing keys: ", paste(missPool, collapse = ", "))
+  
+  out <- dfReg %>%
+    dplyr::select(dplyr::all_of(keys), dplyr::starts_with("share|")) %>%
+    dplyr::rename_with(~ paste0(.x, "_reg"), .cols = dplyr::starts_with("share|")) %>%
+    dplyr::left_join(
+      dfPool %>%
+        dplyr::select(dplyr::all_of(keys), dplyr::starts_with("share|")) %>%
+        dplyr::rename_with(~ paste0(.x, "_pool"), .cols = dplyr::starts_with("share|")),
+      by = keys
+    )
+  
+  w <- out[[wCol]]
+  
+  for (s in modeledSectors) {
+    col <- paste0("share|", s)
+    regCol  <- paste0(col, "_reg")
+    poolCol <- paste0(col, "_pool")
+    
+    if (!regCol %in% names(out))  stop("Missing column in blended join: ", regCol)
+    if (!poolCol %in% names(out)) stop("Missing column in blended join: ", poolCol)
+    
+    out[[col]] <- dplyr::case_when(
+      is.na(w) ~ out[[poolCol]],
+      w <= 0   ~ out[[regCol]],
+      w >= 1   ~ out[[poolCol]],
+      TRUE     ~ (1 - w) * out[[regCol]] + w * out[[poolCol]]
+    )
+  }
+  
+  out %>%
+    dplyr::select(
+      scenario, region, period, decileGroup, consumptionCa, logCons, logCons2,
+      dplyr::starts_with("share|"), dplyr::all_of(wCol)
+    )
+}
+
+
+
+# ----------------------------
+# Weighted RAS / IPF calibration
+# ----------------------------
+weightedRas <- function(shareRawMat, wDecile, macroShare,
+                        eps = 1e-12, maxIter = 2000, tol = 1e-11) {
+  
+  S <- as.matrix(shareRawMat)
+  
+  w <- as.numeric(wDecile)
+  if (any(!is.finite(w)) || all(w <= 0)) stop("wDecile must have positive finite values.")
+  w <- pmax(w, 0)
+  w <- w / sum(w)
+  
+  m <- as.numeric(macroShare)
+  if (any(!is.finite(m)) || any(m < 0)) stop("macroShare must be finite and non-negative.")
+  if (all(m == 0)) stop("macroShare cannot be all zeros.")
+  m <- pmax(m, eps)
+  m <- m / sum(m)
+  
+  stopifnot(nrow(S) == length(w))
+  stopifnot(ncol(S) == length(m))
+  
+  # strictly positive to keep feasibility + non-negativity
+  S <- pmax(S, eps)
+  
+  # initial row normalization
+  S <- S / pmax(rowSums(S), eps)
+  
+  for (it in seq_len(maxIter)) {
+    S_old <- S
+    
+    # 1) column scaling to match weighted column margins: w' S = m
+    colW <- as.numeric(crossprod(w, S))            # length = nSector
+    colFactor <- m / pmax(colW, eps)
+    S <- sweep(S, 2, colFactor, "*")
+    
+    # 2) row normalization to sum to 1
+    S <- S / pmax(rowSums(S), eps)
+    
+    if (max(abs(S - S_old)) < tol) break
+  }
+  
+  S
 }

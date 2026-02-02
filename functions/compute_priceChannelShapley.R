@@ -1,3 +1,7 @@
+# This function performs a Shapley decomposition of goods-category contributions
+# to inequality across all three inequality metrics.
+
+
 compute_priceChannelShapley <- function(
     decileWelfChange,
     decileConsShare,
