@@ -54,7 +54,7 @@ plot_output <- function(outputPath,
       )
   )
   
-  numSector <- length(unique(plotdataWelf$category))
+  numSector <- length(unique(dfDecileWelfChange$category))
   foodSec <- c("Empty calories","Animal products","Fruits vegetables nuts","Staples")
   eneSec <- c("Building electricity", "Building gases", "Building other fuels","Transport energy")
   allSec <- c(foodSec,eneSec, 'Consumption')
@@ -2877,7 +2877,7 @@ plot_output <- function(outputPath,
     
     regOrder <- dfIneqAll$ineqAll %>%
       filter(period == 2060, region != "World", variable == "ineq|Gini",
-             category == "TotalWithTransfNeut", scenario == scen) %>%
+             category == "TotalWithTransfNeut", scenario == 'C_SSP2-loOS-def') %>%
       summarise(pol = mean(value, na.rm = TRUE), .by = region) %>%
       inner_join(ref, by = "region") %>%
       mutate(change = (pol - ref) * 100) %>%
@@ -2945,7 +2945,7 @@ plot_output <- function(outputPath,
     
     regOrder <- dfIneqAll$ineqAll %>%
       filter(period == 2060, region != "World", variable == "ineq|Gini",
-             category == "TotalWithTransfNeut", scenario == scen) %>%
+             category == "TotalWithTransfNeut", scenario == 'C_SSP2-loOS-def') %>%
       summarise(pol = mean(value, na.rm = TRUE), .by = region) %>%
       inner_join(ref, by = "region") %>%
       mutate(change = (pol - ref) * 100) %>%

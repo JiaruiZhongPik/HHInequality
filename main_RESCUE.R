@@ -75,10 +75,10 @@ options(scipen = 999)
 #Config setting
 scenario_mode <- "coupled"
 write_namestring <- "coupled2017"
-#rootdir_remind <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/remind/output"
-#rootdir_magpie <- "/p/projects/remind/runs/REMIND-MAgPIE-2025-04-24/magpie/output"
-rootdir_remind <- "/p/projects/rescue/tier2_scenarios/v1/cpl/remind/output"
-rootdir_magpie <- "/p/projects/rescue/tier2_scenarios/v1/cpl/magpie/output"
+# rootdir_remind <- "/p/projects/rescue/tier2_scenarios/v1/cpl/remind/output"
+# rootdir_magpie <- "/p/projects/rescue/tier2_scenarios/v1/cpl/magpie/output"
+rootdir_remind <- "/p/tmp/jiaruizh/RESCUE_tier2/remind/output"
+rootdir_magpie <- "/p/tmp/jiaruizh/RESCUE_tier2/remind/magpie/output"
 all_runscens <- c("SSP2")
 reference_run_name <- "NPi2025"             #For earlier runs, it's "NPi"     
 all_budgets <- c("loOS-def","hiOS-def")
@@ -95,7 +95,7 @@ taxBase <- 'CO2woLUC'                       # options: ‘CO2woLUC’，'GHGwoLU
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'nB_RAS' ,'-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'NewRescueRuns' ,'-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -226,7 +226,7 @@ p <- plot_output(outputPath = outputPath,
                  data = data, 
                  ineqAll = ineqAll,
                  ineqChannel = ineqChannel,
-                 plotlist = c('decileColiRegbyDecile'),
+                 plotlist = c('remindRegionMap'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
