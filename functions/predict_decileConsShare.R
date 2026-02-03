@@ -29,7 +29,8 @@ predict_decileConsShare <- function(
     blendStartFactor = 1.5,
     blendEndFactor = 10,
     blendingRegGrouping = "H12",
-    mccSumShareRange = c(0.85, 1.05)
+    mccSumShareRange = c(0.85, 1.05),
+    ceilingBuff = 0.2
 ) {
   
   shareVars <- c(
@@ -69,6 +70,16 @@ predict_decileConsShare <- function(
       "share|Transport energy" =
         "`FE|++|Transport` * `Price|Transport|FE` / `Consumption`"
     )
+  
+  plotdf <-  data1 %>%
+    select(-unit) %>%
+    filter(
+      variable %in% c("Consumption", "FEShare|Household", "Population") |
+        str_starts(variable, "share\\|")
+    ) %>%
+    pivot_wider(names_from = variable, values_from = value) %>%
+    mutate(consumptionCa = Consumption / Population *1000)
+  
   
   # -----------------------------
   # B) Decile shares input (SSP/SDP)
@@ -148,6 +159,45 @@ predict_decileConsShare <- function(
   
   shareCols <- grep("^share\\|", colnames(macroWide), value = TRUE)
   
+  # get mcc consumption data
+  hhMcc <- prepare_mccData(sumShareRange = mccSumShareRange)
+  regionMapping <- if (blendingRegGrouping %in% c("H12", "H21")) load_regionMapping(blendingRegGrouping) else NULL
+  hhMcc <- add_regionTag(hhMcc, blendingRegGrouping, regionMapping)
+  
+  
+  ceilingBySector <- hhMcc %>%
+    tidyr::pivot_longer(
+      cols = dplyr::starts_with("share|"),
+      names_to = "sector",
+      values_to = "share"
+    ) %>%
+    dplyr::mutate(sector = stringr::str_remove(sector, "^share\\|")) %>%
+    dplyr::filter(is.finite(share), share > 0, share < 1) %>%
+    dplyr::group_by(sector) %>%
+    dplyr::summarise(
+      shareCeiling = quantile(share, probs = 0.99, na.rm = TRUE),
+      .groups = "drop"
+    )  %>%
+    mutate(sectorCol = paste0("share|", sector)) %>%
+    select(sectorCol, shareCeiling)
+  
+  ceilingVec <- ceilingBySector$shareCeiling
+  names(ceilingVec) <- ceilingBySector$sectorCol
+  
+  ceilingVecBuff <- ceilingVec * (ceilingBuff + 1)
+  
+  
+  applyCeilingWide <- function(df, shareCols, ceilingVec, eps = 1e-6) {
+    colsUse <- intersect(shareCols, names(ceilingVec))
+    df %>%
+      mutate(across(all_of(colsUse), ~ pmin(.x, ceilingVec[cur_column()]))) %>%
+      mutate(across(all_of(shareCols), ~ pmax(.x, eps)))   
+  }
+  
+  
+  
+  
+  
   # -----------------------------
   # F) Optional pooled objects (only if blending)
   # -----------------------------
@@ -171,12 +221,13 @@ predict_decileConsShare <- function(
     )
     
     
-    # compute historic tail of expenditure distribution (for wBlend)
-    hhMcc <- prepare_mccData(sumShareRange = mccSumShareRange)
-    regionMapping <- if (blendingRegGrouping %in% c("H12", "H21")) load_regionMapping(blendingRegGrouping) else NULL
-    hhMcc <- add_regionTag(hhMcc, blendingRegGrouping, regionMapping)
-    
-    
+
+    # -----------------------------
+    # G) Predict with blending + calibration
+    # -----------------------------
+    # 1) attach wBlend (decile-level)
+
+    #  historic max value
     histMaxExpByGeo <- hhMcc %>%
       dplyr::group_by(region) %>%
       dplyr::summarise(
@@ -184,12 +235,7 @@ predict_decileConsShare <- function(
         .groups = "drop"
       )  %>% dplyr::filter(region != "CHA") # CHA removed as MCC only has HK and TWN -> not representative
     
-
-    # -----------------------------
-    # G) Predict with blending + calibration
-    # -----------------------------
-    # 1) attach wBlend (decile-level)
-
+    
     dfBase <- dataDecile %>%
       dplyr::left_join(histMaxExpByGeo, by = "region") %>%
       dplyr::mutate(
@@ -208,8 +254,10 @@ predict_decileConsShare <- function(
     
     # 3) blend shares
     shareBlend <- blendShares(shareRaw, sharePoolRaw, modeledSectors, wCol = "wBlend") %>%
-      select(scenario, region, period, decileGroup, consumptionCa, all_of(shareCols) )
+      select(scenario, region, period, decileGroup, consumptionCa, all_of(shareCols) ) %>%
+      applyCeilingWide(shareCols, ceilingVec)
     
+
     dataCalibrated <- shareBlend %>%
       group_by(scenario, region, period) %>%
       group_modify(function(dfGroup, keys) {
@@ -258,7 +306,8 @@ predict_decileConsShare <- function(
     
 
     shareRaw <- shareRaw %>%
-      dplyr::select(scenario, region, period, decileGroup, consumptionCa, dplyr::starts_with("share|"))
+      dplyr::select(scenario, region, period, decileGroup, consumptionCa, dplyr::starts_with("share|")) %>%
+      applyCeilingWide(shareCols, ceilingVec)
     
   
     dataCalibrated <- shareRaw %>%
@@ -300,6 +349,226 @@ predict_decileConsShare <- function(
   }
   
 
+
+    
+    
+    # Function to generate plots per sector
+    plot_sector <- function(sector) {
+      
+      # Convert sector to its equivalent in dataCalibrated
+      dataCalibrated_sector <- sub("FEShare", "share", sector)
+      
+      y_vals <- plotdf[[sector]]  # `sector` is assumed to be a character string
+      
+      
+      p1 <- ggplot(
+        plotdf,
+        aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
+      ) +
+        geom_point(alpha = 0.6) +
+        facet_wrap(~scenario) +
+        labs(
+          title = paste("REMIND-MAgPIE -", sector),
+          x = "log(ConsumptionCa), US$2017",
+          y = "Share"
+        ) +
+        theme_minimal() +
+        scale_color_brewer(palette = "Paired") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+      
+      
+      #Creat P2
+      df_filtered <- dataCalibrated[dataCalibrated$decileGroup %in% c(1, 10), ]
+      
+      y_vals <- df_filtered[[dataCalibrated_sector]]  # make sure dataCalibrated_sector is a character string
+      
+
+      
+      p2 <- ggplot(
+        dataCalibrated[dataCalibrated$decileGroup %in% c(1, 10), ],
+        aes(x = log(consumptionCa), y = !!sym(dataCalibrated_sector), 
+            color = factor(region), shape = factor(decileGroup))
+      ) +
+        geom_point(alpha = 0.6) +
+        facet_wrap(~scenario) +
+        labs(
+          title = paste("Projected share -", sector),
+          x = "log(ConsumptionCa), US$2017",
+          y = "Share"
+        ) +
+        theme_minimal() +
+        scale_color_brewer(palette = "Paired") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+      
+      p1+p2
+      
+    }
+    
+    # Define sectors you want to loop through
+    sectors <- c(
+      "share|Building gases",
+      "share|Building electricity",
+      "share|Building other fuels",
+      "share|Transport energy"
+    )
+    
+    # Generate combined plots for each sector
+    combined_plots <- purrr::map(sectors, plot_sector)
+    
+    # Combine and display all plots in a grid
+    all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+      theme(legend.position = "bottom") 
+    
+    if(isExport == T){
+      ggsave(
+        filename = paste0(outputPath, "/combined_FE_share_plot_gcd.tiff"),
+        plot = all_combined_plot,
+        width = 10,
+        height = 12,
+        dpi = 300,
+        compression = "lzw"
+      )
+    }
+    
+    
+
+    
+    # Define sectors you want to loop through
+    sectors <- c(
+      "share|Animal products",
+      "share|Staples",
+      "share|Fruits vegetables nuts",
+      "share|Empty calories"
+    )
+    
+    
+    # Generate combined plots for each sector
+    combined_plots <- purrr::map(sectors, plot_sector)
+    
+    # Combine and display all plots in a grid
+    all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+      theme(legend.position = "bottom") 
+    
+    if(isExport == T){
+      ggsave(
+        filename = paste0(outputPath, "/combined_Food_share_plot_gcd.tiff"),
+        plot = all_combined_plot,
+        width = 10,
+        height = 12,
+        dpi = 300,
+        compression = "lzw"
+      ) 
+      
+    }
+
+    
+    if(!all(is.na(countryExample))){
+      
+      
+      # Function to generate plots per sector
+      plot_sector <- function(sector) {
+        # Convert sector to its equivalent in dataCalibrated
+        dataCalibrated_sector <- sub("FEShare", "share", sector)
+        
+        # Create p1
+        p1 <- ggplot(
+          plotdf[plotdf$region == region, ],
+          aes(x = log(consumptionCa), y = !!sym(sector), color = factor(region))
+        ) +
+          geom_point(alpha = 0.6) +
+          facet_wrap(~scenario) +
+          labs(
+            title = paste("REMIND -", sector),
+            x = "log(ConsumptionCa), US$2017",
+            y = "Share"
+          ) +
+          theme_minimal() +
+          ylim(
+            quantile(plotdf[plotdf$region == region, ][[sector]], probs = c(0.01, 0.99), na.rm = TRUE)
+          ) +
+          scale_color_discrete(name = "Region") +
+          geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+        
+        # Create p2
+        p2 <- ggplot(
+          dataCalibrated[dataCalibrated$region == region, ],
+          aes(x = log(consumptionCa), y = !!sym(dataCalibrated_sector), color = factor(decileGroup))
+        ) +
+          geom_point(alpha = 0.6) +
+          facet_wrap(~scenario) +
+          ylim(
+            quantile(dataCalibrated[dataCalibrated$region == region, ][[dataCalibrated_sector]], probs = c(0.01, 0.99), na.rm = TRUE)
+          ) +
+          labs(
+            title = paste("Projected share -", sector),
+            x = "log(ConsumptionCa), US$2017",
+            y = "Share"
+          ) +
+          theme_minimal() +
+          scale_color_discrete(name = "Decile group") +
+          geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.5)
+        
+        p1+p2
+        
+      }
+      
+      # Define sectors you want to loop through
+      sectors <- c(
+        "share|Building gases",
+        "share|Building electricity",
+        "share|Building other fuels",
+        "share|Transport energy"
+      )
+      
+      for (region in countryExample){
+        combined_plots <- purrr::map(sectors, plot_sector)
+        
+        # Combine and display all plots in a grid
+        all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+          theme(legend.position = "bottom") 
+        
+        ggsave(
+          filename = paste0(outputPath,"/combined_FE_share_plot_gcd_",region,".tiff"),
+          plot = all_combined_plot,
+          width = 10,
+          height = 12,
+          dpi = 300,
+          compression = "lzw" )
+      }
+      
+      
+      
+      # Define sectors you want to loop through
+      sectors <- c(
+        "share|Animal products",
+        "share|Staples",
+        "share|Fruits vegetables nuts",
+        "share|Empty calories"
+      )
+      
+      for (region in countryExample){
+        # Generate combined plots for each sector
+        combined_plots <- purrr::map(sectors, plot_sector)
+        
+        # Combine and display all plots in a grid
+        all_combined_plot <- wrap_plots(combined_plots, ncol = 1, guides = "collect") &
+          theme(legend.position = "bottom") 
+        
+        ggsave(
+          filename = paste0(outputPath,"/combined_food_share_plot_gcd_",region,".tiff"),
+          plot = all_combined_plot,
+          width = 10,
+          height = 12,
+          dpi = 300,
+          compression = "lzw"
+        )
+      }
+      
+    }
+
+  
+  
+  
   return(dataCalibrated)
 }
 

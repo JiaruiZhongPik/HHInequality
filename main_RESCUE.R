@@ -95,7 +95,7 @@ taxBase <- 'CO2woLUC'                       # options: ‘CO2woLUC’，'GHGwoLU
 
 
 
-outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'NewRescueRuns' ,'-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+outputPath <- paste0("figure/test/",gini_baseline,'_',consData,'Ceiling' ,'-',format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 
 #----------------------------Project life-cycle---------------------------------
 all_paths = set_pathScenario(reference_run_name, scenario_mode,write_namestring, 
@@ -136,17 +136,17 @@ data <-  read_csv("tmp/taxRemindFixed.csv") %>%
 
 #Get (patched) Engel curve estimates for all regions
 coef <- get_engelCurveCoef(
-  dataSource = "mcc",
-  regressRegGrouping = "H12",
+  dataSource = consData,
+  regressRegGrouping = regressRegGrouping,
   regionOverrides = c(
     CHA = "mccPooled",
     JPN = "mccPooled"
-  )
+  ),
+  mccSumShareRange = c(0.9, 1.1)
 )
 
 
 #Predict consumption shares for each regional decile
-#To do:做了RAS是否就不需要blending了
 decileConsShare <- predict_decileConsShare(
   data,
   coef,
@@ -155,7 +155,9 @@ decileConsShare <- predict_decileConsShare(
   blendStartFactor = 1.5,
   blendEndFactor = 3,
   blendingRegGrouping = "H12",
-  mccSumShareRange = c(0.85, 1.05)
+  mccSumShareRange = c(0.9, 1.1),
+  ceilingBuff = 1.1,
+  isExport = T
 )
 
 
