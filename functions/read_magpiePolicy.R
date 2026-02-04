@@ -58,7 +58,7 @@ read_magpiePolicy <- function(magpierun, magpiepath, magpie_base, magpiepath_bas
       scenario = magpierun,
       variable = paste0('Price|',sector),
       baseline = 'NA',
-      unit = 'USD17PPP per kcal') %>%
+      unit = 'US$2017/kcal') %>%
     bind_rows(dfRun)
 
   #get the expenditure
@@ -120,7 +120,7 @@ dfRun <-    taxrev_magpie %>%
           scenario = magpierun,
           variable = 'Taxes|GHG|MAGPIE',
           baseline = 'NA',
-          unit = 'billion $ MER') %>%
+          unit = 'billion US$2017/yr') %>%
   bind_rows(dfRun) %>% 
   select(-sector)
 

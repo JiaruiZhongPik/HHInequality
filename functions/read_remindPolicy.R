@@ -161,15 +161,11 @@ read_remindPolicy <- function(remind_run,remind_path, remind_path_base, isDispla
            variable = "Taxes|GHG|REMIND" )
 
   
-  carbonPrice <- remind_data %>% 
-    filter( variable == 'Price|Carbon' )
-  
   remind_data <- bind_rows(remind_data, FE_consumerPrice,  
                            FE_consumerQuantityBuilding,
                            FE_consumerPriceDelt,
                            Good_price,
-                           Tax_remind,
-                           carbonPrice)
+                           Tax_remind)
 
   
   remind_data <- remind_data %>% 

@@ -111,7 +111,7 @@ data = prepare_modelData(all_paths,isExport = T) %>%
 
 
 #instead of reading, load saved data for convenience
-# load("RESCUE.RData")
+# load("RESCUE_update.RData")
 
 #Read corrected co2 tax revenue, this is a manual fix for the RESCUE Scenarios, unfinished!!
 data <-  read_csv("tmp/taxRemindFixed.csv") %>%
@@ -151,6 +151,7 @@ decileConsShare <- predict_decileConsShare(
   data,
   coef,
   gini_baseline = gini_baseline,
+  countryExample = coef$region %>% unique(),
   doBlending = F,                   #blending is only a option when dataSource is 'mcc'
   blendStartFactor = 1.5,
   blendEndFactor = 3,
@@ -202,6 +203,13 @@ ineqChannel <- compute_priceChannelShapley(
 )
 
 
+#-------Export result------
+
+out_full <- write_results(path = outputPath,
+                          data, decileConsShare,
+                          decileWelfChange, anchRealCons,
+                          ineqAll, ineqChannel)
+
 
 #-------Plot-------
 #all plots
@@ -228,7 +236,7 @@ p <- plot_output(outputPath = outputPath,
                  data = data, 
                  ineqAll = ineqAll,
                  ineqChannel = ineqChannel,
-                 plotlist = c('remindRegionMap'),
+                 plotlist = c('shockVsExposurebySec'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots

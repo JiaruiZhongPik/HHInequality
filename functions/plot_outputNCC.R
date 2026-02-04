@@ -258,7 +258,7 @@ plot_outputNCC <- function(){
                          data = data, 
                          ineqAll = ineqAll,
                          ineqChannel = ineqChannel,
-                         plotlist = 'ineqRegBySecSelected_Gini' ,
+                         plotlist = c('ineqRegBySecSelected_Gini') ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   
@@ -269,7 +269,7 @@ plot_outputNCC <- function(){
                          data = data, 
                          ineqAll = ineqAll,
                          ineqChannel = ineqChannel,
-                         plotlist = 'categoryColiVsIneq' ,
+                         plotlist = c('ineqWorldWithTransf_GiniRela', 'categoryColiVsIneq') ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
  
   
@@ -347,11 +347,11 @@ plot_outputNCC <- function(){
     stem = "Figure5",
     type = "research_2col",
     caption_words = 120,
-    ncol = 1,
+    ncol = 2,
     collect_guides = F,
     legend_position = 'none',
     legend_direction = "horizontal",
-    custom_height_mm = 140,
+    custom_height_mm = 80,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
   )

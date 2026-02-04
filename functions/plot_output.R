@@ -276,7 +276,7 @@ plot_output <- function(outputPath,
           labels = scenario_labels
         ) +
         
-        labs(x = "Income Decile Group", y = "Real consumpition Change(%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
@@ -337,7 +337,7 @@ plot_output <- function(outputPath,
           labels = scenario_labels
         ) +
         
-        labs(x = "Income Decile Group", y = "Real consumpition Change(%)", fill = "Scenario", color = "Scenario") +
+        labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
         theme(
@@ -1172,7 +1172,7 @@ plot_output <- function(outputPath,
                            labels = unique(plotdf$period)) +
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
-        labs(x = "Year", y = "Gini change from reference (points)", fill = "FE category") +
+        labs(x = "Year", y = "Gini change from reference (points)") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
         #ylim(-1,2.2) + 
         theme(axis.title.x = element_blank())
@@ -2486,7 +2486,7 @@ plot_output <- function(outputPath,
         str_starts(variable, "relaPrice") |
           str_starts(variable, "share"),
         scenario != "C_SSP2-NPi2025",
-        period %in% c(2040,2070,2100)
+        period %in% c(2035,2060,2100)
       ) %>%
       separate(
         variable,
@@ -2656,7 +2656,7 @@ plot_output <- function(outputPath,
         theme(legend.position = "none") +
         labs(
           x = "Contribution to COLI change (log points)",
-          y = "Contribution to ΔGini (pp)",
+          y = "Contribution to change of Gini (pp)",
           colour = "Sector"
         )
       ,
@@ -3007,7 +3007,7 @@ plot_output <- function(outputPath,
           scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
           labs(
             x = NULL,
-            y = "Gini change from NPi(pp)",
+            y = "Gini change from NPi (pp)",
             # title    = "Gini change from reference",
             subtitle =  scenario_labels[[scen]]
           ) +
