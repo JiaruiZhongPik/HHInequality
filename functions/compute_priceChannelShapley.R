@@ -6,14 +6,28 @@ compute_priceChannelShapley <- function(
     decileWelfChange,
     decileConsShare,
     data,
-    sectors = c("Building electricity", "Building other fuels",
-                "Empty calories","Fruits vegetables nuts", "Transport energy",
-                "Other commodities", "Building gases", "Staples" ,"Animal products"),
     montecarlo = TRUE,
     n_perms = 300,
+    seed = NULL,
     doChecks = TRUE,
-    returnDebug = FALSE   # NEW: if TRUE, also return priceOnlyLevels + shockTable
+    returnDebug = FALSE   # if TRUE, also return priceOnlyLevels + shockTable
 ) {
+  
+  # Validate required globals are in scope
+  required_globals <- c("all_runscens", "reference_run_name")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
+  
+  # Dynamically extract sectors from decileConsShare share| columns
+  sectors <- decileConsShare %>%
+    dplyr::select(dplyr::starts_with("share|")) %>%
+    names() %>%
+    stringr::str_remove("^share\\|")
   
   baselineScenario = paste0('C_',all_runscens,'-',reference_run_name)
   
@@ -158,6 +172,11 @@ compute_priceChannelShapley <- function(
     tibble::tibble(goodsCategory = names(out), value = as.numeric(out))
   }
   
+  # Set seed for reproducible Monte Carlo sampling if provided
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  
   shapleyTheilL <- df_shock %>%
     dplyr::group_by(scenario, region, period) %>%
     dplyr::group_modify(~ compute_shapley(.x, index = "Theil", theil_type = "L",
@@ -211,9 +230,7 @@ compute_priceChannelShapley <- function(
       shockTable = df_shock
     ))
   } else {
-    return(
-      ineq = shapley_out
-    )
+    return(shapley_out)
   }
 }
 

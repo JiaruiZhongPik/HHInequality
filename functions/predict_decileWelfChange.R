@@ -4,12 +4,24 @@
 
 #-------------1. First-order welfare effect-------------------------
 
-predict_decileWelfChange <- function(data1 = data, data2 = decileConsShare, 
+predict_decileWelfChange <- function(data1 = data, 
+                                     data2 = decileConsShare, 
                                      taxBase = 'CO2woLUC',
                                      climaFund = 0,
                                      fund_return_scale = 1,
                                      payg = 1,
-                                     micro_model = 'FOwelfare', fixed_point = 'midpoint'){
+                                     micro_model = 'FOwelfare', 
+                                     fixed_point = 'midpoint'){
+  
+  # Validate required globals are in scope
+  required_globals <- c("all_paths", "all_budgets", "all_runscens", "reference_run_name")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
   
   #get sectors for later use
   sectors <- data2 %>%

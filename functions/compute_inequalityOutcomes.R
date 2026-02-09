@@ -17,11 +17,24 @@ compute_inequalityOutcomes <- function(
     doChecks = TRUE
 ) {
   
+  # Validate required globals are in scope
+  required_globals <- c("all_runscens", "reference_run_name")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
+  
   result <- list()
   
-  sectors = c("Building electricity", "Building other fuels",
-              "Empty calories","Fruits vegetables nuts", "Transport energy",
-              "Other commodities", "Building gases", "Staples" ,"Animal products")
+  # Dynamically extract sectors from decileConsShare share| columns
+  sectors <- decileConsShare %>%
+    dplyr::select(dplyr::starts_with("share|")) %>%
+    names() %>%
+    stringr::str_remove("^share\\|")
+  
   baselineScenario <- paste0('C_',all_runscens,'-',reference_run_name)
   
   anchRealCons <- anchRealCons %>% mutate(decilePop_mil = Pop_mil/10 )
@@ -106,7 +119,6 @@ compute_inequalityOutcomes <- function(
         
         df <- .x
         
-        # weights: mimic your old "population/10" logic if you don't pass a weight column
         if (is.null(w_col)) {
           w <- df$Pop_mil / 10
         } else {
@@ -123,7 +135,7 @@ compute_inequalityOutcomes <- function(
           theil_result_base <- as.data.frame(iTheilL(df[[base_col]],  grp, w = w))
         }
         
-        # rename base columns to avoid collisions (like your old code)
+        # rename base columns to avoid collisions
         names(theil_result_base) <- paste0(names(theil_result_base), "|base")
         
         # IMPORTANT: bind back onto df, preserving region/decile rows

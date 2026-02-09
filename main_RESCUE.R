@@ -35,7 +35,7 @@ library(mrdrivers)
 library(GDPuc)
 library(quitte)
 library(countrycode)
-library(readxl) 
+library(readxl)
 library(ineq) #install into personal library for running on cluster
 library(furrr) #install into personal library for running on cluster
 library(assertthat)
@@ -86,7 +86,7 @@ REMIND_pattern <- "REMIND_generic*.mif"
 
 #Model setting
 regions <- 'H12'                            # options are H12 or H21, seemingly redundant
-regressRegGrouping <- 'H12'                 # determines regional heterogeneity of Engel curves, options are: "H12", "H21", "pool"
+regressRegGrouping <- 'H12'                 # determines regional heterogeneity of Engel curves, options are: "H12","pool"
 consData <- 'mcc'                           # options are: gcd, mcc
 gini_baseline <- 'rao'                      # ‘rao’ ； ‘poblete05’ ; 'poblete07'
 fixed_point <- 'midpoint'                   # options: "base","policy","midpoint"
@@ -152,10 +152,7 @@ decileConsShare <- predict_decileConsShare(
   coef,
   gini_baseline = gini_baseline,
   countryExample = coef$region %>% unique(),
-  doBlending = F,                   #blending is only a option when dataSource is 'mcc'
-  blendStartFactor = 1.5,
-  blendEndFactor = 3,
-  blendingRegGrouping = "H12",
+  doBlending = F,
   mccSumShareRange = c(0.9, 1.1),
   ceilingBuff = 1.1,
   isExport = T
@@ -172,7 +169,7 @@ plot_inspection(outputPath = outputPath,
 #predict welfare change of different category
 decileWelfChange <- predict_decileWelfChange(data, decileConsShare, 
                                              taxBase = taxBase,
-                                             climaFund = 0,
+                                             climaFund = 0,   #climate fund is not included as it should consider international transfer as a first step, which is not ready yet. The parameter is kept for future use.
                                              #fund_return_scale = 0.5,
                                              payg = 1,
                                              micro_model = micro_model, 
@@ -199,14 +196,14 @@ ineqChannel <- compute_priceChannelShapley(
   decileConsShare   = decileConsShare,
   data              = data,
   montecarlo = TRUE,
-  n_perms = 300
+  n_perms = 300,
+  seed = 12345
 )
 
 
 #-------Export result------
 
-out_full <- write_results(path = outputPath,
-                          data, decileConsShare,
+out_full <- write_results(data, decileConsShare,
                           decileWelfChange, anchRealCons,
                           ineqAll, ineqChannel)
 

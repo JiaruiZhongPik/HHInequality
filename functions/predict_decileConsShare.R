@@ -6,14 +6,22 @@
 #   3) ratio calibration (method A) to ensure macro consistency
 #   4) closure + renormalization (Other commodities)
 #
-# NOTE: This script assumes these external functions already exist in your codebase:
-#   - calc_addVariable()
-#   - analyze_regression()
-#   - prepare_mccData()
-#   - prepare_GiniSDP()
-#   - load_regionMapping()
-# and these objects exist in scope when calling predict_decileConsShare():
-#   - regions, all_runscens, outputPath
+# Parameters:
+#   - data: Input data frame with consumption and price variables
+#   - coef: Engel curve coefficients (from get_engelCurveCoef)
+#   - gini_baseline: Baseline for Gini distribution ('rao', 'poblete05', 'poblete07')
+#   - regions: Regional grouping ('H12', 'H21', etc.) - REQUIRED
+#   - all_runscens: List of scenarios to process (e.g., c('SSP2')) - REQUIRED
+#   - outputPath: Directory path for saving plots - REQUIRED if isExport = TRUE
+#   - countryExample: Countries to generate regional plots for (default: NA)
+#   - isDisplay: Whether to display plots (default: FALSE)
+#   - isExport: Whether to save plots to disk (default: FALSE)
+#   - doBlending: Whether to use regional/pooled blending (default: FALSE)
+#   - blendStartFactor: Blending transition start factor (default: 1.5)
+#   - blendEndFactor: Blending transition end factor (default: 10)
+#   - blendingRegGrouping: Regional grouping for blending (default: 'H12')
+#   - mccSumShareRange: Valid range for MCC share sums (default: c(0.85, 1.05))
+#   - ceilingBuff: Buffer for ceiling constraints (default: 0.2)
 # =============================================================================
 
 
@@ -32,6 +40,16 @@ predict_decileConsShare <- function(
     mccSumShareRange = c(0.85, 1.05),
     ceilingBuff = 0.2
 ) {
+  
+  # Validate required globals are in scope
+  required_globals <- c("all_paths", "all_budgets", "all_runscens", "reference_run_name", "regions", "outputPath")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
   
   shareVars <- c(
     "share|Building gases",
@@ -103,6 +121,7 @@ predict_decileConsShare <- function(
     dplyr::filter(variable == "consumptionCa") %>%
     dplyr::slice(rep(1:dplyr::n(), each = 10)) %>%
     dplyr::group_by(region, period, scenario) %>%
+    dplyr::arrange(region, period, scenario) %>%  
     dplyr::mutate(
       decileGroup = 1:10,
       gdp_scenario = sub(".*((SSP[0-9]+[A-Z]*?)|(SDP_[^\\-]+)).*", "\\1", scenario)
@@ -146,15 +165,17 @@ predict_decileConsShare <- function(
   periods    <- unique(data1$period)
   regionsAll <- sort(unique(data1$region))
   
-
-  coefRegForWide <- if (dplyr::n_distinct(coef$region) == 1) dplyr::mutate(coef, region = "pool") else coef
+  # Check if coefficients are pooled (uniform across regions)
+  # If so, we'll expand them to all regions for regional projections
+  isCoefPooled <- dplyr::n_distinct(coef$region) == 1
   
   coefWideReg <- coefToWide(
-    coefTbl   = coefRegForWide,
-    scenarios = scenarios,
-    periods   = periods,
-    regions   = regionsAll,
-    suffix    = "Reg"
+    coefTbl    = coef,
+    scenarios  = scenarios,
+    periods    = periods,
+    regions    = regionsAll,
+    suffix     = "Reg",
+    isPooled   = isCoefPooled
   )
   
   shareCols <- grep("^share\\|", colnames(macroWide), value = TRUE)
@@ -212,12 +233,14 @@ predict_decileConsShare <- function(
       mccSumShareRange = mccSumShareRange
     )
     
+    # Pool coefficients are also uniform across regions, so expand them
     coefWidePool <- coefToWide(
       coefTbl   = coefPool,
       scenarios = scenarios,
       periods   = periods,
       regions   = regionsAll,
-      suffix    = "Pool"
+      suffix    = "Pool",
+      isPooled  = TRUE
     )
     
     
@@ -255,7 +278,7 @@ predict_decileConsShare <- function(
     # 3) blend shares
     shareBlend <- blendShares(shareRaw, sharePoolRaw, modeledSectors, wCol = "wBlend") %>%
       select(scenario, region, period, decileGroup, consumptionCa, all_of(shareCols) ) %>%
-      applyCeilingWide(shareCols, ceilingVec)
+      applyCeilingWide(shareCols, ceilingVecBuff)
     
 
     dataCalibrated <- shareBlend %>%
@@ -307,7 +330,7 @@ predict_decileConsShare <- function(
 
     shareRaw <- shareRaw %>%
       dplyr::select(scenario, region, period, decileGroup, consumptionCa, dplyr::starts_with("share|")) %>%
-      applyCeilingWide(shareCols, ceilingVec)
+      applyCeilingWide(shareCols, ceilingVecBuff)
     
   
     dataCalibrated <- shareRaw %>%
@@ -658,7 +681,16 @@ blendWeightSmoothstep <- function(exp, histTailExp, startFactor = 2, endFactor =
 # =============================================================================
 # helpers: Coefficient table -> wide
 # =============================================================================
-coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "") {
+# =============================================================================
+# helpers: Coefficient table -> wide
+# Handles both regional and pooled (uniform) coefficients
+# =============================================================================
+coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "", isPooled = FALSE) {
+  
+  # If coefficients are pooled, replicate for all regions
+  if (isPooled && !is.null(regions)) {
+    coefTbl <- tidyr::crossing(region = regions, coefTbl %>% dplyr::select(-region))
+  }
   
   out <- tidyr::crossing(
     scenario = stringr::str_remove(scenarios, "-(rem|mag)-\\d+$"),
@@ -668,10 +700,6 @@ coefToWide <- function(coefTbl, scenarios, periods, regions = NULL, suffix = "")
     dplyr::mutate(variable = paste(sector, regressor, sep = "|")) %>%
     dplyr::select(region, scenario, period, variable, value) %>%
     tidyr::pivot_wider(names_from = variable, values_from = value)
-  
-  if (identical(unique(coefTbl$region), "pool")) {
-    out <- tidyr::crossing(region = regions, out %>% dplyr::select(-region))
-  }
   
   if (nzchar(suffix)) {
     out <- dplyr::rename_with(

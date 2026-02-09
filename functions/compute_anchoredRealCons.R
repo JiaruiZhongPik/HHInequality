@@ -9,6 +9,16 @@ compute_anchoredRealCons <- function(
     data
 ) {
   
+  # Validate required globals are in scope
+  required_globals <- c("all_runscens", "reference_run_name")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
+  
   baselineScenario <- paste0('C_',all_runscens,'-',reference_run_name)
   weightCol = "consumptionCa"
   
@@ -77,7 +87,9 @@ compute_anchoredRealCons <- function(
       dplyr::mutate(
         consDecile_total_bil = C_total_bil * (relConsIndex / 10),
         consDecile_pc        = C_pc * relConsIndex,
+        # Log-change: better for decomposition/elasticity (symmetric)
         dln_pc_vs_base       = 100 * log(consDecile_pc / c_base_pc),
+        # Linear percentage change: more intuitive for interpretation
         relChange_pc_vs_base = (consDecile_pc / c_base_pc - 1) * 100,
         scheme               = scheme_label
       )

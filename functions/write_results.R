@@ -1,8 +1,24 @@
 
-write_results <- function (path = outputPath,
-                           data, decileConsShare,
+write_results <- function (data, decileConsShare,
                            decileWelfChange, anchRealCons,
                            ineqAll, ineqChannel){
+  
+  # Validate required globals are in scope
+  required_globals <- c("outputPath")
+  missing <- required_globals[!sapply(required_globals, exists, where = parent.frame())]
+  
+  if (length(missing) > 0) {
+    stop("Function requires these variables in calling environment: ", 
+         paste(missing, collapse = ", "),
+         "\nMake sure they are defined in the script before calling this function.")
+  }
+  
+  # Dynamically extract sectors from decileConsShare share| columns
+  sectors <- decileConsShare %>%
+    dplyr::select(dplyr::starts_with("share|")) %>%
+    names() %>%
+    stringr::str_remove("^share\\|")
+  
   out <- data %>%
     filter(
       variable %in% c(
@@ -46,17 +62,7 @@ write_results <- function (path = outputPath,
       period      = as.numeric(period),
       decileGroup = as.character(decileGroup),
       variable    = case_when(
-        category %in% c(
-          "Animal products",
-          "Building electricity",
-          "Building gases",
-          "Building other fuels",
-          "Empty calories",
-          "Fruits vegetables nuts",
-          "Other commodities",
-          "Staples",
-          "Transport energy"
-        ) ~ paste0("dlnCons|goods|", category),
+        category %in% sectors ~ paste0("dlnCons|goods|", category),
         
         str_detect(category, "^Consumption pre-transfer")    ~ "dlnCons|account|Consumption pre-transfer (income effect)",
         str_detect(category, "^Neut transfer effect")        ~ "dlnCons|account|Neut transfer effect",
