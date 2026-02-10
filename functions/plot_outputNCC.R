@@ -210,10 +210,10 @@ plot_outputNCC <- function(){
  # Figures for the main text
   
   
-  plotList1 <- c('welfByPeriodShaded','taxRevenueOptionWorld',
+  plotList1 <- c('welfByPeriodShaded','ineqWorldWithTransf_GiniRela',
     'welfByDecileNeut','welfByDecileEpc')
   
-  figure1 <- plot_output(outputPath = outputPath, 
+  figure1_list <- plot_output(outputPath = outputPath, 
                          decileWelfChange = decileWelfChange, 
                          decileConsShare = decileConsShare, 
                          anchRealCons = anchRealCons,
@@ -223,7 +223,23 @@ plot_outputNCC <- function(){
                          plotlist = plotList1 ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   #reorder
-  figure1 <- figure1[plotList1]
+  figure1_list <- figure1_list[plotList1]
+  
+  # Extract plot objects and combine with shared legends
+  p1 <- figure1_list[[plotList1[1]]]$plot
+  p2 <- figure1_list[[plotList1[2]]]$plot
+  p3 <- figure1_list[[plotList1[3]]]$plot
+  p4 <- figure1_list[[plotList1[4]]]$plot
+  
+  # Combine with patchwork, collecting guides
+  figure1_top <- (p1 + p2) + patchwork::plot_layout(guides = "collect")
+  figure1_bottom <- (p3 + p4) + patchwork::plot_layout(guides = "collect")
+  
+  # Stack rows vertically
+  figure1_composed <- figure1_top / figure1_bottom
+  
+  # Wrap composed figure with metadata for export
+  figure1 <- list(list(plot = figure1_composed, width = 8.5, height = 6))
   
   
   
@@ -269,7 +285,7 @@ plot_outputNCC <- function(){
                          data = data, 
                          ineqAll = ineqAll,
                          ineqChannel = ineqChannel,
-                         plotlist = c('ineqWorldWithTransf_GiniRela', 'categoryColiVsIneq') ,
+                         plotlist = c( 'categoryColiVsIneq') ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
  
   
@@ -287,7 +303,7 @@ plot_outputNCC <- function(){
     stem = "Figure1",
     type = "research_2col",
     caption_words = 160,
-    ncol = 2,
+    ncol = 1,
     collect_guides = F,
     custom_height_mm = 160,
     legend_direction = "horizontal",
@@ -347,11 +363,11 @@ plot_outputNCC <- function(){
     stem = "Figure5",
     type = "research_2col",
     caption_words = 120,
-    ncol = 2,
+    ncol = 1,
     collect_guides = F,
     legend_position = 'none',
     legend_direction = "horizontal",
-    custom_height_mm = 80,
+    custom_height_mm = 140,
     word_format = "png",
     tag_x = 0.05,tag_y = 1
   )

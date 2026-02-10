@@ -109,7 +109,6 @@ predict_decileWelfChange <- function(data1 = data,
       select( -variable ) %>%
       rename( relaPrice = value )
 
-
   }
   
 
@@ -163,7 +162,8 @@ predict_decileWelfChange <- function(data1 = data,
       
       
     } else if (fixed_point == 'midpoint') {
-
+      
+      #baseline categorical consumption share
       baseConsShare <- data2 %>%
         filter(
           scenario %in% 
@@ -178,25 +178,26 @@ predict_decileWelfChange <- function(data1 = data,
           .cols = starts_with("share|")
         )
       
-      consShare <- data2 %>%
+      #categorical consumption share in policy scenario
+      policyConsShare <- data2 %>%
         select( -consumptionCa) %>%
         filter(scenario  %in% paste0( 'C_',all_runscens,'-',all_budgets)) %>%
         left_join( mapping, by= c('scenario'= 'remind_run')) %>%
         merge(baseConsShare, by = c( "region", "period", "decileGroup", "remind_base"))
       
-      
+      #compute the average consumption share in the policy and baseline scenario, and use it to compute welfare change with midpoint formula
       for (s in sectors) {
         orig_col <- paste0("share|", s)
         base_col <- paste0("share|", s, "|Base")
         avg_col  <- paste0("share|", s, "|Avg")
         
-        consShare[[avg_col]] <- (consShare[[orig_col]] + consShare[[base_col]]) / 2
+        policyConsShare[[avg_col]] <- (policyConsShare[[orig_col]] + policyConsShare[[base_col]]) / 2
       }
       
-      decileWelfChange <- consShare %>%
+      decileWelfChange <- policyConsShare %>%
         select(
-          -matches("^share\\|[^|]+$"),    # removes original share|X
-          -matches("\\|Base$")            # removes any column ending with |Base
+          -matches("^share\\|[^|]+$"),    # removes original policy share|X columns (kept only |Avg versions)
+          -matches("\\|Base$")            # removes baseline share|X|Base columns
         ) %>%
         rename_with(
           ~ stringr::str_remove(., "\\|Avg$"),  # remove |Avg suffix
@@ -204,18 +205,15 @@ predict_decileWelfChange <- function(data1 = data,
         ) %>%
         pivot_longer( cols = starts_with('share'),
                       names_to = 'variable',
-                      values_to = 'share')%>%
-        separate( col= variable,into = c("variable", "category"), sep = "\\|"  )%>%
+                      values_to = 'share') %>%
+        separate( col= variable,into = c("variable", "category"), sep = "\\|"  ) %>%
         select(-variable ) %>%
         left_join(relaPrice, by = c('scenario','region','period','category')) %>%
-        mutate(decilWelfChange = - log(relaPrice) * share *100) %>%
+        mutate(decilWelfChange = - log(relaPrice) * share * 100) %>%
         select(scenario, region, period, decileGroup, category, decilWelfChange)
-      
     }
 
-    
-    
-    
+
   }else(print ('Other approach not yet implemented'))
   
   
@@ -256,7 +254,7 @@ predict_decileWelfChange <- function(data1 = data,
     out
   }
   
-  # consumption with Neut (your current assumption)
+  # consumption with Neut 
   consNeut <- data2 %>%
     dplyr::select(scenario, region, period, decileGroup, consumptionCa) %>%
     dplyr::left_join(transferNeut, by = c("scenario","region","period","decileGroup")) %>%
@@ -270,7 +268,7 @@ predict_decileWelfChange <- function(data1 = data,
     value_col = consumptionPre,
     baselineScenario = baselineScenario,
     policyRegex = policyRegex,
-    label = "Consumption pre-transfer (income effect)"
+    label = "Exp pre-transfer (income effect)"
   )
   
   
@@ -288,7 +286,7 @@ predict_decileWelfChange <- function(data1 = data,
     value_col = consumptionCa,
     baselineScenario = baselineScenario,
     policyRegex = policyRegex,
-    label = "Consumption With NeutTransf"
+    label = "Exp With NeutTransf"
   )
   
   
@@ -314,7 +312,7 @@ predict_decileWelfChange <- function(data1 = data,
     value_col = consumptionEpc,
     baselineScenario = baselineScenario,
     policyRegex = policyRegex,
-    label = "Consumption With EpcTransf"
+    label = "Exp With EpcTransf"
   )
   
   

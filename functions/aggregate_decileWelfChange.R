@@ -16,21 +16,21 @@ aggregate_decileWelfChange <- function(
   } else if (secLevel %in% c("fullSec", "groupedSec", "totalSec")) {
     welf <- data1 %>%
       dplyr::filter(
-        !stringr::str_starts(category, "Consumption"),
+        !stringr::str_starts(category, "Exp"),
         !stringr::str_detect(category, "transfer effect")
       )
   } else if (secLevel == "totalWithTransfEpc") {
     welf <- data1 %>%
       dplyr::filter(
-        !(stringr::str_starts(category, "Consumption") &
-            category != "Consumption With EpcTransf"),
+        !(stringr::str_starts(category, "Exp") &
+            category != "Exp With EpcTransf"),
         !stringr::str_detect(category, "transfer effect")
       )
   } else if (secLevel == "totalWithTransfNeut") {
     welf <- data1 %>%
       dplyr::filter(
-        !(stringr::str_starts(category, "Consumption") &
-            category != "Consumption With NeutTransf"),
+        !(stringr::str_starts(category, "Exp") &
+            category != "Exp With NeutTransf"),
         !stringr::str_detect(category, "transfer effect")
       )
   }

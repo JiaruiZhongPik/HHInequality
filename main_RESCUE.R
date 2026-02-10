@@ -24,7 +24,7 @@ source('functions/compute_anchoredRealCons.R')
 source('functions/compute_inequalityOutcomes.R')
 source('functions/compute_priceChannelShapley.R')
 source('functions/compute_transfer.R')
-
+source('functions/write_results.R')
 
 #Load library
 library(remind2)

@@ -64,11 +64,11 @@ write_results <- function (data, decileConsShare,
       variable    = case_when(
         category %in% sectors ~ paste0("dlnCons|goods|", category),
         
-        str_detect(category, "^Consumption pre-transfer")    ~ "dlnCons|account|Consumption pre-transfer (income effect)",
+        str_detect(category, "^Exp pre-transfer")    ~ "dlnCons|account|Exp pre-transfer (income effect)",
         str_detect(category, "^Neut transfer effect")        ~ "dlnCons|account|Neut transfer effect",
-        str_detect(category, "^Consumption With NeutTransf") ~ "dlnCons|account|Consumption With NeutTransf",
-        str_detect(category, "^Epc transfer effect")         ~ "dlnCons|account|Epc transfer effect",
-        str_detect(category, "^Consumption With EpcTransf")  ~ "dlnCons|account|Consumption With EpcTransf",
+        str_detect(category, "^Exp With NeutTransf") ~ "dlnCons|account|Exp With NeutTransf",
+        str_detect(category, "^Neut transfer effect")        ~ "dlnCons|account|Neut transfer effect",
+        str_detect(category, "^Exp With EpcTransf")  ~ "dlnCons|account|Exp With EpcTransf",
         
         TRUE ~ paste0("dlnCons|other|", category)
       ),

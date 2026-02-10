@@ -32,7 +32,7 @@ plot_output <- function(outputPath,
         axis.text.x = element_text(size = 9,angle = 45, hjust = 1),
         axis.text.y = element_text(size = 9),
         axis.title.x = element_text(size = 10),
-        axis.title.y = element_text(size = 10),
+        axis.title.y = element_text(size = 8),
         legend.title = element_text(size = 10),
         legend.text  = element_text(size = 9),
         legend.position = "bottom",
@@ -85,6 +85,21 @@ plot_output <- function(outputPath,
   )
   
   regSelect <- c('CHA', 'EUR', 'IND', 'LAM', 'SSA', 'USA')
+  
+  region_labels <- c(
+    "OAS" = "Other Asia",
+    "CAZ" = "Canada, Australia, New Zealand",
+    "CHA" = "China",
+    "EUR" = "EU",
+    "IND" = "India",
+    "JPN" = "Japan",
+    "LAM" = "Latin America",
+    "MEA" = "Middle East and North Africa",
+    "NEU" = "Other Europe",
+    "REF" = "Reforming economies",
+    "SSA" = "Sub-Saharan Africa",
+    "USA" = "United States"
+  )
   
   period <- unique(dfDecileConsShare$period)
   
@@ -245,50 +260,19 @@ plot_output <- function(outputPath,
       mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByDecileNeut"]] <- list (
-      
-      plot = ggplot(plotdf, 
-                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
-        
-        geom_boxplot(outlier.shape = NA, width = 0.4, 
-                     position = position_dodge(width = 0.5), color = "grey20") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
-                  linewidth = 0.7) +
-        
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        scale_fill_manual(
-          values = myScenPalette,
-          labels = scenario_labels
-        ) +
-        
-        scale_color_manual(
-          values = myScenPalette,
-          labels = scenario_labels
-        ) +
-        
+      plot = ggplot(plotdf, aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
+        geom_boxplot(outlier.shape = NA, width = 0.4, position = position_dodge(width = 0.5), color = "grey20") +
+        geom_jitter(aes(color = scenario), position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), alpha = 0.3, size = 0.2) +
+        geom_line(data = avg_df_decile, aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), linewidth = 0.7) +
+        stat_summary(fun = mean, geom = "point", aes(group = scenario), position = position_dodge(width = 0.7), shape = 20, size = 2.5, color = "gray30") +
+        scale_fill_manual(values = myScenPalette, labels = scenario_labels) +
+        scale_color_manual(values = myScenPalette, labels = scenario_labels) +
         labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        )
-      ,
-      
+        theme(axis.text.x = element_text(angle = 0), legend.position = "bottom", legend.direction = "horizontal"),
       width = 6,
-      height = 4 
-      
+      height = 4
     )
     
   }
@@ -306,50 +290,19 @@ plot_output <- function(outputPath,
       mutate(scenario = factor(scenario, levels = scenario_levels))
     
     p[["welfByDecileEpc"]] <- list (
-      
-      plot = ggplot(plotdf, 
-                    aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
-        
-        geom_boxplot(outlier.shape = NA, width = 0.4, 
-                     position = position_dodge(width = 0.5), color = "grey20") +
-        
-        geom_jitter(aes(color = scenario),
-                    position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), 
-                    alpha = 0.3, size = 0.2) +
-        
-        # 🔹 Add mean lines by scenario
-        geom_line(data = avg_df_decile, 
-                  aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), 
-                  linewidth = 0.7) +
-        
-        stat_summary(fun = mean, geom = "point", 
-                     aes(group = scenario), 
-                     position = position_dodge(width = 0.7), 
-                     shape = 20, size = 2.5, color = "gray30") +
-        
-        scale_fill_manual(
-          values = myScenPalette,
-          labels = scenario_labels
-        ) +
-        
-        scale_color_manual(
-          values = myScenPalette,
-          labels = scenario_labels
-        ) +
-        
+      plot = ggplot(plotdf, aes(x = factor(decileGroup), y = relChange_pc_vs_base, fill = scenario)) +
+        geom_boxplot(outlier.shape = NA, width = 0.4, position = position_dodge(width = 0.5), color = "grey20") +
+        geom_jitter(aes(color = scenario), position = position_jitterdodge(jitter.width = 0.5, dodge.width = 0.5), alpha = 0.3, size = 0.2) +
+        geom_line(data = avg_df_decile, aes(x = decileGroup, y = meanRelChange, group = scenario, color = scenario), linewidth = 0.7) +
+        stat_summary(fun = mean, geom = "point", aes(group = scenario), position = position_dodge(width = 0.7), shape = 20, size = 2.5, color = "gray30") +
+        scale_fill_manual(values = myScenPalette, labels = scenario_labels) +
+        scale_color_manual(values = myScenPalette, labels = scenario_labels) +
         labs(x = "Income Decile Group", y = "Real consumpition Change (%)", fill = "Scenario", color = "Scenario") +
         theme_minimal() +
         coord_cartesian(ylim = quantile(plotdf$relChange_pc_vs_base, probs = c(0.02, 0.99), na.rm = TRUE)) +
-        theme(
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "bottom",
-          legend.direction = "horizontal"
-        )
-      ,
-      
+        theme(axis.text.x = element_text(angle = 0), legend.position = "bottom", legend.direction = "horizontal"),
       width = 6,
-      height = 4 
-      
+      height = 4
     )
     
   }
@@ -423,33 +376,22 @@ plot_output <- function(outputPath,
       select(scenario,period,region,relChange_pc_vs_base) %>%
       mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    dataDecileEpc <-     plotdf <- dfAnchRealCons %>% 
+    dataDecileEpc <- dfAnchRealCons %>% 
       filter(scheme == 'EPC') %>%
       select(scenario,period,region,relChange_pc_vs_base) %>%
       mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    loPattern <- "loOS"   # low overshoot scenarios contain this substring
-    hoPattern <- "hiOS"   # high overshoot scenarios contain this substring
-    
     dataDecile <- bind_rows(
-      dataDecileNeut %>% mutate(transfer = "Neut"),
-      dataDecileEpc  %>% mutate(transfer = "EPC")
+      dataDecileNeut %>% mutate(category = "Neut"),
+      dataDecileEpc  %>% mutate(category = "EPC")
     ) %>%
       mutate(
-        scenario = case_when(
-          str_detect(as.character(scenario), loPattern) ~ "1.5°C LO",
-          str_detect(as.character(scenario), hoPattern) ~ "1.5°C HO",
-          TRUE ~ NA_character_
-        ),
-        scenario = factor(scenario, levels = c("1.5°C LO", "1.5°C HO")),
-        transfer  = factor(transfer,  levels = c("Neut", "EPC")),
+        scenario = factor(scenario, levels = scenario_levels),
+        category  = factor(category,  levels = c("Neut", "EPC")),
         period    = as.integer(period)
       ) 
-    
     plotdf <- dataDecile %>%
-      # group_by(period, scenario, region, transfer) %>%
-      # summarise(relChange_pc_vs_base = mean(relChange_pc_vs_base, na.rm =T)) %>%
-      group_by(period, scenario, transfer) %>%
+      group_by(period, scenario, category) %>%
       summarise(
         med = median(relChange_pc_vs_base, na.rm = TRUE),
         p25 = quantile(relChange_pc_vs_base, 0.25, na.rm = TRUE),
@@ -463,34 +405,40 @@ plot_output <- function(outputPath,
       
       plot = ggplot(
         plotdf,
-        aes(x = period, y = med, color = scenario, linetype = transfer, group = interaction(scenario, transfer))
+        aes(x = period, y = med, color = scenario, linetype = category, group = interaction(scenario, category))
       ) +
         # optional: show where transfer tends to lose relevance (adjust if you want)
         annotate("rect", xmin = 2070, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.06) +
         geom_hline(yintercept = 0, linewidth = 0.4) +
         geom_ribbon(aes(ymin = p25, ymax = p75, fill = scenario), alpha = 0.12, color = NA, show.legend = FALSE) +
-        geom_line(linewidth = 1.0) +
+        geom_line(linewidth = 0.8) +
         geom_point(size = 2) +
         scale_color_manual(
-          values = c(
-            "1.5°C LO" = "#779ec6",
-            "1.5°C HO" = "#e8ab67"
-          )
+          name = "Scenario",
+          values = myScenPalette,
+          breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
+                     "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
+          labels = scenario_labels
         ) +
         scale_fill_manual(
-          values = c(
-            "1.5°C LO" = "#779ec6",
-            "1.5°C HO" = "#e8ab67"
-          )
-        )+
+          values = myScenPalette,
+          breaks = c("C_SSP2-PkBudg1000", "C_SSP2-PkBudg650", 
+                     "C_SSP2-hiOS-def", "C_SSP2-loOS-def"),
+          labels = scenario_labels,
+          guide = "none"
+        ) +
+        scale_linetype_manual(
+          name = "Compensation",
+          values = c("Neut" = "solid", "EPC" = "dashed"),
+          labels = c("Neut" = "Neut", "EPC" = "EPC")
+        ) +
         scale_x_continuous(breaks = sort(unique(plotdf$period))) +
         labs(
           x = "Year",
-          y = "Real consumption change (%)",
-          color = "Scenario",
-          linetype = "Transfers"
-          #subtitle = "All income deciles"
+          y = "Real consumption change (%)"
         ) +
+        guides(color = guide_legend(order = 2),
+               linetype = guide_legend(order = 1)) +
         theme_bw() +
         theme(legend.position = "bottom", panel.grid.minor = element_blank(),
               axis.text.x = element_text(angle = 45, hjust = 1))
@@ -512,7 +460,7 @@ plot_output <- function(outputPath,
       select(scenario,period,region,decileGroup,relChange_pc_vs_base) %>%
       mutate(scenario = factor(scenario, levels = scenario_levels))
     
-    dataDecileEpc <-     plotdf <- dfAnchRealCons %>% 
+    dataDecileEpc <- dfAnchRealCons %>% 
       filter(scheme == 'EPC') %>%
       select(scenario,period,region,decileGroup,relChange_pc_vs_base) %>%
       mutate(scenario = factor(scenario, levels = scenario_levels))
@@ -968,7 +916,8 @@ plot_output <- function(outputPath,
         facet_grid(
           region ~ scenario,
           scales = "free_y",
-          labeller = labeller(scenario = as_labeller(scenario_labels))
+          labeller = labeller(scenario = as_labeller(scenario_labels),
+                             region = as_labeller(region_labels))
         ) +
         scale_x_continuous(breaks = sort(unique(plotdf$period))) +
         scale_fill_manual(values = mySecPalette) +
@@ -978,7 +927,10 @@ plot_output <- function(outputPath,
           fill = "Category"
         ) +
         theme_minimal() +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        theme(strip.text.y = element_text(angle = 0, hjust = 0),
+              strip.background = element_blank(),
+              axis.text.x = element_text(angle = 45, hjust = 1),
+              panel.grid.minor = element_blank()) +
         guides(fill = guide_legend(reverse = TRUE))
       ,
       
@@ -1146,7 +1098,11 @@ plot_output <- function(outputPath,
         "C_SSP2-PkBudg650",
         "C_SSP2-loOS-def", 
         "C_SSP2-hiOS-def" 
-      )))
+      )),
+            category = recode(category,
+                            "TotalWithTransfNeut" = "Neut",
+                            "TotalWithTransfEpc" = "EPC"),
+            category = factor(category, levels = c("Neut", "EPC")))
 
     
     
@@ -1156,6 +1112,7 @@ plot_output <- function(outputPath,
       plot = ggplot(plotdf, 
                     aes(x = period, y = value, linetype = category, color = scenario)) +
         geom_line(size = 0.8) + 
+        geom_point(size = 2) +
         scale_color_manual(
           name   = "Scenario",  # legend title
           values = myScenPalette,
@@ -1164,18 +1121,21 @@ plot_output <- function(outputPath,
           labels = scenario_labels
         ) +
         scale_linetype_manual(name = "Compensation",
-                                        values = c("TotalWithTransfNeut" = "solid", 
-                                                   "TotalWithTransfEpc" = "dashed"),
-                                        labels = c("TotalWithTransfNeut" = "Neutral",
-                                                   "TotalWithTransfEpc" = "EPC")) +
+                              values = c("Neut" = "solid", 
+                                         "EPC" = "dashed"),
+                              labels = c("Neut" = "Neut",
+                                         "EPC" = "EPC")) +
         scale_x_continuous(breaks = unique(plotdf$period),
                            labels = unique(plotdf$period)) +
         geom_hline(yintercept = 0, linetype = "solid", color = "grey80")+
         # Labels and styling
-        labs(x = "Year", y = "Gini change from reference (points)") +
+        labs(x = "Year", y = "Global Gini change from reference (pp)") +
         coord_cartesian(ylim = quantile(plotdf$value, probs = c(0.01, 0.999), na.rm = TRUE)) +
-        #ylim(-1,2.2) + 
-        theme(axis.title.x = element_blank())
+        guides(color = guide_legend(order = 2),
+               linetype = guide_legend(order = 1)) +
+        theme_bw() +
+        theme(axis.title.x = element_blank(), legend.position = "bottom", panel.grid.minor = element_blank(),
+              axis.text.x = element_text(angle = 45, hjust = 1))
       ,
       
       width = 5,
@@ -1683,13 +1643,20 @@ plot_output <- function(outputPath,
         facet_grid(
           region ~ scenario,
           scales = "free_y",
-          labeller = labeller(scenario = as_labeller(scenario_labels))
+          labeller = labeller(scenario = as_labeller(scenario_labels),
+                             region = as_labeller(region_labels))
         )+
         scale_fill_manual(values = mySecPalette) +
+        scale_x_continuous(breaks = sort(unique(plotdf$period))) +
         labs(x = "Year",
-             y = "Gini change from reference (points)",
-             fill = "Sectors") +
-        theme_minimal()
+             y = "Regional Gini change from reference (pp)",
+             fill = "Category") +
+        theme_minimal() +
+        theme(strip.text.y = element_text(angle = 0, hjust = 0),
+              strip.background = element_blank(),
+              axis.text.x = element_text(angle = 45, hjust = 1),
+              panel.grid.minor = element_blank()) +
+        guides(fill = guide_legend(reverse = TRUE))
       ,
       
       width = 10,
@@ -1749,13 +1716,15 @@ plot_output <- function(outputPath,
         ),
         labels = scenario_labels
       )+
-      facet_wrap(~ region, ncol = 3) +
+      facet_wrap(~ region, ncol = 3,
+                 labeller = as_labeller(region_labels)) +
       scale_fill_manual(values = mySecPalette) +
+      scale_x_continuous(breaks = sort(unique(plotdf$period))) +
       scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
                           labels = levels(plotdf$period_fac) ) +
       labs(x = "Year",
            y = "Theil'T change from reference",
-           fill = "Sectors",
+           fill = "Category",
            shape = "Scenario") +
       theme_minimal() +
       theme(
@@ -1766,9 +1735,7 @@ plot_output <- function(outputPath,
         panel.grid.major.x = element_line(color = "grey70", linewidth = 0.1, linetype = "dashed"),
         panel.grid.minor = element_blank(),
         panel.background = element_rect(fill = "white", color = NA)
-      ) +
-      guides(fill = guide_legend(nrow = 3), 
-             shape = guide_legend(nrow = 2))
+      )
     ,
     
     width = 10,
@@ -2911,8 +2878,10 @@ plot_output <- function(outputPath,
           size    = 3
         ) +
         coord_sf(expand = FALSE) +
-        # DISCRETE fill scale for regions
-        scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
+        # DISCRETE fill scale for regions with full names
+        scale_fill_paletteer_d("PrettyCols::Summer", 
+                               name = "REMIND region",
+                               labels = region_labels) +
         guides(fill = "none") +
         # CONTINUOUS color scale for Gini dots
         scale_color_gradient(
@@ -3004,7 +2973,9 @@ plot_output <- function(outputPath,
           ) +
           scale_y_continuous(limits = c(-5, 5)) + 
           coord_flip() +
-          scale_fill_paletteer_d("PrettyCols::Summer", name = "REMIND region") +
+          scale_fill_paletteer_d("PrettyCols::Summer", 
+                                 name = "REMIND region",
+                                 labels = region_labels) +
           labs(
             x = NULL,
             y = "Gini change from NPi (pp)",
@@ -3021,7 +2992,8 @@ plot_output <- function(outputPath,
           theme(
             panel.grid.major.y = element_blank(),
             legend.position    = "right",
-            panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.4)
+            panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.4),
+            axis.text.y        = element_text(size = 8)
           )
         
         ,
