@@ -59,6 +59,20 @@ plot_output <- function(outputPath,
   eneSec <- c("Building electricity", "Building gases", "Building other fuels","Transport energy")
   allSec <- c(foodSec,eneSec, 'Consumption')
   
+  # Category label mapping
+  categoryLabels <- c(
+    "Empty calories" = "Processed food",
+    "Animal products" = "Animal products",
+    "Fruits vegetables nuts" = "Fruits vegetables nuts",
+    "Staples" = "Staples",
+    "Building electricity" = "Building electricity",
+    "Building gases" = "Building gases",
+    "Building other fuels" = "Building other fuels",
+    "Transport energy" = "Transport energy",
+    "Consumption" = "Consumption",
+    "Other commodities" = "Other commodities"
+  )
+  
   scenario_levels <- c(
     "C_SSP2-PkBudg1000",
     "C_SSP2-PkBudg650",
@@ -840,7 +854,7 @@ plot_output <- function(outputPath,
         theme_minimal() +
         #scale_fill_paletteer_d("ggprism::floral2") +
         #scale_fill_paletteer_d("beyonce::X82") +
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1))+
         guides(fill = guide_legend(reverse = TRUE))
 
@@ -874,7 +888,7 @@ plot_output <- function(outputPath,
           fill = "Category"
         ) +
         theme_minimal() +
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         guides(fill = guide_legend(reverse = TRUE))
       ,
@@ -906,7 +920,8 @@ plot_output <- function(outputPath,
     
     plotdf <- plotdfWorld %>%
       rbind(plotdfReg) %>%
-      mutate(region = factor(region, levels = c('World',regSelect)))
+      mutate(region = factor(region, levels = c('World',regSelect)),
+             scenario = factor(scenario, levels = scenario_levels))
     
     # Automate over all scenarios
     p[['regColiBySecSelect']] <- list(
@@ -920,7 +935,7 @@ plot_output <- function(outputPath,
                              region = as_labeller(region_labels))
         ) +
         scale_x_continuous(breaks = sort(unique(plotdf$period))) +
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         labs(
           x = "Year",
           y = "Contribution to COLI change (log points)",
@@ -973,7 +988,7 @@ plot_output <- function(outputPath,
             fill = "Category"
           ) +
           theme_minimal() +
-          scale_fill_manual(values = mySecPalette) +
+          scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
           theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)),
         
         width = 10,
@@ -1594,7 +1609,7 @@ plot_output <- function(outputPath,
         labels = scenario_labels
         )+
         facet_wrap(~ region, ncol = 3) +
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
                             labels = levels(plotdf$period_fac) ) +
         labs(x = "Year",
@@ -1646,7 +1661,7 @@ plot_output <- function(outputPath,
           labeller = labeller(scenario = as_labeller(scenario_labels),
                              region = as_labeller(region_labels))
         )+
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         scale_x_continuous(breaks = sort(unique(plotdf$period))) +
         labs(x = "Year",
              y = "Regional Gini change from reference (pp)",
@@ -1718,7 +1733,7 @@ plot_output <- function(outputPath,
       )+
       facet_wrap(~ region, ncol = 3,
                  labeller = as_labeller(region_labels)) +
-      scale_fill_manual(values = mySecPalette) +
+      scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
       scale_x_continuous(breaks = sort(unique(plotdf$period))) +
       scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
                           labels = levels(plotdf$period_fac) ) +
@@ -1795,7 +1810,7 @@ plot_output <- function(outputPath,
           labels = scenario_labels
         )+
         facet_wrap(~ region, ncol = 3) +
-        scale_fill_manual(values = mySecPalette) +
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels) +
         scale_x_continuous( breaks = sort(unique(plotdf$period_num)), 
                             labels = levels(plotdf$period_fac) ) +
         labs(x = "Year",
@@ -2537,7 +2552,7 @@ plot_output <- function(outputPath,
             expand = expansion(mult = c(0.05, 0.15))
             # bottom 5% extra, top 25% extra (tweak as you like)
           ) +
-          scale_color_manual(values = mySecPalette) +
+          scale_color_manual(values = mySecPalette, labels = categoryLabels) +
           labs(
             x = "Consumption share (%)",        
             y = "Price chagne from reference (%)",
@@ -2670,7 +2685,7 @@ plot_output <- function(outputPath,
           fill = "Category"
         ) +
         #scale_fill_paletteer_d("NatParksPalettes::Olympic",direction = -1) +
-        scale_fill_manual(values = mySecPalette)+
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels)+
         guides(fill = guide_legend(reverse = T)) +
         theme(
           legend.position  = "right",
@@ -2726,7 +2741,7 @@ plot_output <- function(outputPath,
         ) +
         #scale_fill_paletteer_d("ggprism::floral2") +
         #scale_fill_paletteer_d("NatParksPalettes::Olympic") +
-        scale_fill_manual(values = mySecPalette)+
+        scale_fill_manual(values = mySecPalette, labels = categoryLabels)+
         guides(fill = guide_legend(reverse = FALSE)) +
         theme(
           legend.position  = "right",

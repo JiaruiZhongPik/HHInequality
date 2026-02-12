@@ -233,7 +233,7 @@ p <- plot_output(outputPath = outputPath,
                  data = data, 
                  ineqAll = ineqAll,
                  ineqChannel = ineqChannel,
-                 plotlist = c('shockVsExposurebySec'),
+                 plotlist = c('regColiBySecSelect'),
                  micro_model = micro_model, fixed_point = fixed_point, isDisplay= T, isExport = T)
 
 #To get all regional plots
