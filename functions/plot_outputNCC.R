@@ -87,14 +87,18 @@ plot_outputNCC <- function(){
         legend.position = legend_position,
         legend.margin   = margin(t = -3, b = 0, r = 0, l = 0, unit = "mm")
       )
-    wrap <- wrap + plot_annotation(tag_levels = tag_levels, tag_prefix = tag_prefix, tag_suffix = tag_suffix) &
-      theme(
-        plot.tag.position = c(tag_x, tag_y),                    # move "a"/"b"
-        plot.tag = element_text(
-          family = tag_fontfamily, face = tag_face, size = tag_size,
-          hjust = 0, vjust = 1, margin = margin(r = tag_margin_r) # small gap to axis
+    
+    # Only add panel tags if tag_levels is not NULL
+    if (!is.null(tag_levels)) {
+      wrap <- wrap + plot_annotation(tag_levels = tag_levels, tag_prefix = tag_prefix, tag_suffix = tag_suffix) &
+        theme(
+          plot.tag.position = c(tag_x, tag_y),
+          plot.tag = element_text(
+            family = tag_fontfamily, face = tag_face, size = tag_size,
+            hjust = 0, vjust = 1, margin = margin(r = tag_margin_r)
+          )
         )
-      ) 
+    } 
     
     # 1) PDF
     nature_save_pdf(
@@ -173,7 +177,8 @@ plot_outputNCC <- function(){
                                       word_format = c("svg","emf","png"), png_dpi = 300,
                                       collect_guides = TRUE, legend_position = "bottom", 
                                       legend_direction = "horizontal",
-                                      legend_box = "vertical") {
+                                      legend_box = "vertical",
+                                      force_tags = FALSE) {
     
     type <- match.arg(type); word_format <- match.arg(word_format)
     if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
@@ -181,6 +186,9 @@ plot_outputNCC <- function(){
     panels <- extract_panels(x)
     plots  <- lapply(panels, `[[`, "plot")
     rel_w  <- vapply(panels, function(e) e$width %or% 1, numeric(1))
+    
+    # Only show panel tags if there are multiple panels or force_tags is TRUE
+    tag_levels_use <- if (length(panels) > 1 || force_tags) tag_levels else NULL
     
     nature_export_multipanel_both(
       plots = plots,
@@ -191,7 +199,7 @@ plot_outputNCC <- function(){
       layout = "ncol", n = ncol,
       rel_widths = rel_w,
       custom_height_mm = custom_height_mm,
-      tag_levels = tag_levels,
+      tag_levels = tag_levels_use,
       tag_x = tag_x, tag_y = tag_y,
       tag_margin_r = tag_margin_r,
       tag_size = tag_size,
@@ -287,7 +295,16 @@ plot_outputNCC <- function(){
                          ineqChannel = ineqChannel,
                          plotlist = c( 'categoryColiVsIneq') ,
                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
- 
+  
+  sfigure1 <- plot_output(outputPath = outputPath, 
+                          decileWelfChange = decileWelfChange, 
+                          decileConsShare = decileConsShare, 
+                          anchRealCons = anchRealCons,
+                          data = data, 
+                          ineqAll = ineqAll,
+                          ineqChannel = ineqChannel,
+                          plotlist = c('consCaDecilebyReg') ,
+                          micro_model = micro_model, fixed_point = fixed_point, isDisplay= F, isExport = T)
   
   
   dir <- paste0(outputPath,'/ncc')
@@ -308,7 +325,8 @@ plot_outputNCC <- function(){
     custom_height_mm = 160,
     legend_direction = "horizontal",
     legend_box = 'vertical',
-    word_format = "png"     # or "emf"/"png"
+    word_format = "png",
+    force_tags = TRUE
   )
   
   nature_export_from_list(
@@ -372,86 +390,22 @@ plot_outputNCC <- function(){
     tag_x = 0.05,tag_y = 1
   )
   
+  nature_export_from_list(
+    sfigure1,
+    dir =   dir,
+    stem = "SFigure1",
+    type = "research_2col",
+    caption_words = 120,
+    ncol = 1,
+    collect_guides = F,
+    legend_position = 'bottom',
+    legend_direction = "horizontal",
+    custom_height_mm = 200,
+    word_format = "png",
+    tag_x = 0.05,tag_y = 1
+  )
+  
 
-  # nature_export_from_list(
-  #   figure4,
-  #   dir =   dir,
-  #   stem = "Figure4",
-  #   type = "research_2col",
-  #   caption_words = 160,
-  #   ncol = 1,
-  #   collect_guides = F,
-  #   custom_height_mm = 160,
-  #   word_format = "png"     # or "emf"/"png"
-  # )
-  # 
-  # 
-  # 
-  # nature_export_from_list(
-  #   figure5,
-  #   dir =   dir,
-  #   stem = "Figure5",
-  #   type = "research_2col",
-  #   caption_words = 120,
-  #   ncol = 1,
-  #   collect_guides = F,
-  #   custom_height_mm = 160,
-  #   word_format = "png"     # or "emf"/"png"
-  # )
-  # 
-  # 
-  # 
-  # nature_export_from_list(
-  #   figure5,
-  #   dir =   dir,
-  #   stem = "Figure5",
-  #   type = "research_2col",
-  #   caption_words = 120,
-  #   ncol = 1,
-  #   collect_guides = F,
-  #   custom_height_mm = 160,
-  #   word_format = "png"     # or "emf"/"png"
-  # )
-  # 
-  # 
-  # nature_export_from_list(
-  #   figure6,
-  #   dir =   dir,
-  #   stem = "Figure6",
-  #   type = "research_2col",
-  #   caption_words = 120,
-  #   ncol = 1,
-  #   collect_guides = T,
-  #   custom_height_mm = 140,
-  #   word_format = "png",
-  #   tag_x = 0.05,tag_y = 1
-  # )
-  # 
-  # 
-  # nature_export_from_list(
-  #   figure7,
-  #   dir =   dir,
-  #   stem = "Figure7",
-  #   type = "research_2col",
-  #   caption_words = 160,
-  #   ncol = 1,
-  #   collect_guides = F,
-  #   custom_height_mm = 160,
-  #   word_format = "png"     # or "emf"/"png"
-  # )
-  
-  
-  # nature_export_from_list(
-  #   figure8,
-  #   dir =   dir,
-  #   stem = "Figure7",
-  #   type = "research_2col",
-  #   caption_words = 160,
-  #   ncol = 1,
-  #   collect_guides = F,
-  #   custom_height_mm = 160,
-  #   word_format = "png"     # or "emf"/"png"
-  # )
   
 }
 

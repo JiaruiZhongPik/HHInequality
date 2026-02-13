@@ -817,6 +817,59 @@ plot_output <- function(outputPath,
     
   }
   
+  if(any(plotlist=='consCaDecilebyReg')| allExport ){
+    
+    plotdf <- dfDecileConsShare %>% 
+      filter(scenario == 'C_SSP2-NPi2025',
+             period %in% c(2030, 2060, 2100)) %>%
+      select(region, period, decileGroup, consumptionCa) %>%
+      mutate(period = factor(period, levels = c(2030, 2060, 2100)),
+             decileGroup = factor(decileGroup, levels = 1:10))
+    
+    p[["consCaDecilebyReg"]] <- list(
+      
+      plot = ggplot(plotdf, 
+                    aes(x = decileGroup, y = consumptionCa/1000, fill = decileGroup)) +
+        geom_col(color = "grey20", linewidth = 0.3) +
+        
+        scale_fill_manual(
+          values = rev(c("#053138FF", "#9FDFED", "#0B8CA9FF", "#AEC7BEFF",
+                         "#FAF3CEFF", "#CFE690FF", "#F2AB70FF", "#FEC5A0FF",
+                         "#F2AB70FF", "#FEC5A0FF")),
+          guide = "none"
+        ) +
+        
+        labs(x = "Income Decile Group", y = "Per Capita Consumption (thousand USD2017)") +
+        
+        facet_grid(region ~ period, 
+                   scales = "free_y",
+                   labeller = labeller(region = as_labeller(region_labels))) +
+        
+        theme_minimal() +
+        theme(
+          axis.text.x = element_text(size = 9, angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 9),
+          axis.title.x = element_text(size = 10),
+          axis.title.y = element_text(size = 8),
+          strip.text.y = element_text(angle = 0, hjust = 0),
+          strip.background = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.grid.major.y = element_line(
+            color = "grey70",
+            linewidth = 0.1,
+            linetype = "dashed"
+          ),
+          panel.grid.major.x = element_blank()
+        )
+      ,
+      
+      width = 12,
+      height = 14
+      
+    )
+    
+  }
+  
 #-----------------------------End. 2.reg plots all aggregated------------------- 
   
   
