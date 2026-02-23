@@ -98,3 +98,44 @@ logit <- function(p, eps = 1e-9) {
 }
 
 invLogit <- function(x) 1/(1 + exp(-x))
+
+
+#Helper : region mapping helper
+load_regionMapping <- function(regressRegGrouping) {
+  if (regressRegGrouping == "H12") {
+    
+    readr::read_delim(
+      "input/regionmappingH12.csv",
+      delim = ";",
+      escape_double = FALSE,
+      col_types = readr::cols(X = readr::col_skip()),
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    ) %>%
+      dplyr::rename(geo = CountryCode, region = RegionCode)
+    
+  } else if (regressRegGrouping == "H21") {
+    readr::read_delim(
+      "input/regionmapping_21_EU11.csv",
+      delim = ";",
+      escape_double = FALSE,
+      col_types = readr::cols(X = readr::col_skip(), missingH12 = readr::col_skip()),
+      trim_ws = TRUE,
+      show_col_types = FALSE
+    ) %>%
+      dplyr::rename(geo = CountryCode, region = RegionCode)
+    
+  } else {
+    NULL
+  }
+}
+
+  
+  add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
+    if (regressRegGrouping == "pool") {
+      df %>% dplyr::mutate(region = "pool")
+    } else {
+      if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
+      df %>% dplyr::left_join(regionMapping, by = "geo")
+    }
+  }

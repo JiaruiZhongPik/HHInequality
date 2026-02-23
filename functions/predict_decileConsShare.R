@@ -774,18 +774,6 @@ prepareConsShare <- function(data, regions, gini_baseline,
 }
 
 
-# =============================================================================
-# helpers: Add region tag to microdata for tail computation
-# =============================================================================
-add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
-  if (regressRegGrouping == "pool") {
-    df %>% dplyr::mutate(region = "pool")
-  } else {
-    if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
-    df %>% dplyr::left_join(regionMapping, by = "geo")
-  }
-}
-
 
 # =============================================================================
 # Micro prediction: raw shares from one coefficient set (Reg or Pool)

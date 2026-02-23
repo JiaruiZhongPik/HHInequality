@@ -166,15 +166,7 @@ analyze_regression <- function(consData = c("gcd", "mcc"),
   } else {
     prepare_mccData(sumShareRange = mccSumShareRange)
   }
-  
-  add_regionTag <- function(df, regressRegGrouping, regionMapping = NULL) {
-    if (regressRegGrouping == "pool") {
-      df %>% dplyr::mutate(region = "pool")
-    } else {
-      if (is.null(regionMapping)) stop("regionMapping is NULL but regressRegGrouping requires it.")
-      df %>% dplyr::left_join(regionMapping, by = "geo")
-    }
-  }
+
   
   hh <- add_regionTag(hh, regressRegGrouping, regionMapping)
   
@@ -197,35 +189,7 @@ analyze_regression <- function(consData = c("gcd", "mcc"),
 }
 
 
-#Helper : region mapping helper
-load_regionMapping <- function(regressRegGrouping) {
-  if (regressRegGrouping == "H12") {
-    
-    readr::read_delim(
-      "input/regionmappingH12.csv",
-      delim = ";",
-      escape_double = FALSE,
-      col_types = readr::cols(X = readr::col_skip()),
-      trim_ws = TRUE,
-      show_col_types = FALSE
-    ) %>%
-      dplyr::rename(geo = CountryCode, region = RegionCode)
-    
-  } else if (regressRegGrouping == "H21") {
-    readr::read_delim(
-      "input/regionmapping_21_EU11.csv",
-      delim = ";",
-      escape_double = FALSE,
-      col_types = readr::cols(X = readr::col_skip(), missingH12 = readr::col_skip()),
-      trim_ws = TRUE,
-      show_col_types = FALSE
-    ) %>%
-      dplyr::rename(geo = CountryCode, region = RegionCode)
-    
-  } else {
-    NULL
-  }
-}
+
 
 
 
